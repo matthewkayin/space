@@ -3,7 +3,7 @@
 #include <glad/glad.h>
 
 Mesh::Mesh(const float* vertices, unsigned int vertices_size, const unsigned int* indices, unsigned int indices_size) {
-    num_indices = indices_size;
+    num_indices = indices_size / sizeof(unsigned int);
 
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
@@ -12,10 +12,10 @@ Mesh::Mesh(const float* vertices, unsigned int vertices_size, const unsigned int
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * vertices_size, vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices_size, vertices, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * indices_size, indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_size, indices, GL_STATIC_DRAW);
 
     // vertex positions
     glEnableVertexAttribArray(0);
