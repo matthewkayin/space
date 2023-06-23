@@ -54,6 +54,7 @@ int main() {
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     unsigned int shader = shader_compile("./shader/vertex.glsl", "./shader/fragment.glsl");
+    unsigned int light_shader = shader_compile("./shader/light_vertex.glsl", "./shader/fragment.glsl");
 
     int width, height, nr_channels;
     unsigned int texture;
@@ -73,99 +74,90 @@ int main() {
 
     float vertices[] = {
         -0.5f, -0.5f, -0.5f,
+        0.5f, -0.5f, -0.5f,
+        0.5f, 0.5f, -0.5f,
+        -0.5f, 0.5f, -0.5f,
+
         -0.5f, -0.5f, 0.5f,
         0.5f, -0.5f, 0.5f,
-        0.5f, -0.5f, -0.5f,
-
-        -0.5f, 0.5f, -0.5f,
-        -0.5f, 0.5f, 0.5f,
         0.5f, 0.5f, 0.5f,
-        0.5f, 0.5f, -0.5f,
+        -0.5f, 0.5f, 0.5f
     };
+
     unsigned int indices[] = {
-        // top face
         0, 1, 3,
-        1, 2, 3,
-        // right face
-        3, 2, 7,
-        2, 6, 7,
-        // left face
-        4, 5, 0,
-        5, 1, 0,
-        // bottom face
-        4, 5, 7,
-        5, 6, 7,
-        // front face
-        4, 0, 7,
-        0, 3, 7,
-        // back face
+        3, 1, 2,
+
         1, 5, 2,
-        5, 6, 2
+        2, 5, 6,
+
+        5, 4, 6,
+        6, 4, 7,
+
+        4, 0, 7,
+        7, 0, 3,
+
+        3, 2, 7,
+        7, 2, 6,
+
+        4, 5, 0,
+        0, 5, 1
     };
 
     float ship_vertices[] = {
-        0.0f, 0.1, 0.2f,
-        -0.4f, 0.6f, 0.0f,
-        0.4f, 0.6f, 0.0f,
+        0.0f, 0.2f, -0.1f,
+        -0.4f, 0.0f, -0.6f,
+        0.4f, 0.0f, -0.6f,
 
-        0.0f, -0.6f, 0.3f,
-        -0.8f, -0.6f, 0.2f,
-        0.8f, -0.6f, 0.2f,
+        0.0f, 0.3f, 0.6f,
+        -0.8f, 0.2f, 0.6f,
+        0.8f, 0.2f, 0.6f,
 
-        -1.0f, -0.4f, 0.0f,
-        1.0f, -0.4f, 0.0f,
+        -1.0f, 0.0f, 0.4f,
+        1.0f, 0.0f, 0.4f,
 
-        -1.0f, -0.6f, 0.0f,
-        1.0f, -0.6f, 0.0f,
+        -1.0f, 0.0f, 0.6f,
+        1.0f, 0.0f, 0.6f,
 
-        -0.4f, -0.6f, -0.2f,
-        0.4f, -0.6f, -0.2f
+        -0.4f, -0.2f, 0.6f,
+        0.4f, -0.2f, 0.6f
     };
     unsigned int ship_indices[] = {
+        // top
         0, 1, 2,
 
+        0, 5, 3,
         0, 3, 4,
-        0, 3, 5,
 
         0, 4, 1,
-        0, 5, 2,
+        0, 2, 5,
 
         4, 6, 1,
-        5, 7, 2,
+        5, 2, 7,
 
         4, 8, 6,
-        5, 9, 7,
+        5, 7, 9,
 
-        8, 10, 1,
-        9, 11, 2,
+        // bottom
+        1, 8, 10,
+        9, 2, 11,
 
-        10, 1, 2,
-        10, 11, 2,
+        1, 6, 8,
+        9, 7, 2,
+
+        2, 1, 10,
+        2, 10, 11,
 
         // back
-        3, 10, 11,
-        3, 4, 10,
+        3, 11, 10,
+        4, 3, 10,
         3, 5, 11,
         5, 9, 11,
-        4, 8, 10
+        4, 10, 8
     };
 
     Mesh cube = Mesh(vertices, sizeof(vertices), indices, sizeof(indices));
-    Mesh ship = Mesh(ship_vertices, sizeof(ship_vertices), ship_indices, sizeof(ship_indices));
-
-    unsigned int vbo;
-    unsigned int cube_vao;
-    glGenVertexArrays(1, &cube_vao);
-    glGenBuffers(1, &vbo);
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glBindVertexArray(cube_vao);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
+     Mesh ship = Mesh(ship_vertices, sizeof(ship_vertices), ship_indices, sizeof(ship_indices));
 
     glm::vec3 camera_position = glm::vec3(0.0f, 0.0f, 3.0f);
     glm::vec3 camera_move_direction = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -175,6 +167,8 @@ int main() {
     const Uint8* keystate = SDL_GetKeyboardState(NULL);
 
     glm::vec3 model_rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+
+    bool is_wireframe = true;
 
     // Game loop
     bool running = true;
@@ -193,6 +187,13 @@ int main() {
                 } else {
                     running = false;
                 }
+            } else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_w) {
+                if (is_wireframe) {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                } else {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                }
+                is_wireframe = !is_wireframe;
             } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == 1 && SDL_GetRelativeMouseMode() == SDL_FALSE) {
                 SDL_SetRelativeMouseMode(SDL_TRUE);
             } else if (SDL_GetRelativeMouseMode() == SDL_TRUE && e.type == SDL_MOUSEMOTION) {
@@ -242,6 +243,10 @@ int main() {
 
         glUseProgram(shader);
 
+        glm::vec3 light_pos = glm::vec3(2.0f, 3.0f, -1.0f);
+        glUniform3fv(glGetUniformLocation(shader, "light_pos"), 1, glm::value_ptr(light_pos));
+        glUniform3fv(glGetUniformLocation(shader, "view_pos"), 1, glm::value_ptr(camera_position));
+
         // view / projection transformations
         glm::mat4 view;
         view = glm::lookAt(camera_position, camera_position + camera_direction, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -255,7 +260,18 @@ int main() {
         model = glm::rotate(model, glm::radians(model_rotation.x), glm::vec3(0.0f, 1.0f, 0.0f));
         model = glm::rotate(model, glm::radians(model_rotation.y), glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        ship.draw(shader);
+        cube.draw(shader);
+        // cube.draw(shader);
+        //
+        glUseProgram(light_shader);
+
+        glm::mat4 light_model = glm::mat4(1.0f);
+        light_model = glm::scale(light_model, glm::vec3(0.3f));
+        light_model = glm::translate(light_model, light_pos);
+        glUniformMatrix4fv(glGetUniformLocation(light_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(light_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(glGetUniformLocation(light_shader, "model"), 1, GL_FALSE, glm::value_ptr(light_model));
+        cube.draw(light_shader);
 
         SDL_GL_SwapWindow(window);
     }
