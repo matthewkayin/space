@@ -4,71 +4,35 @@
 
 #include <glad/glad.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 #include <stb_image.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <ft2build.h>
 
 #include <cstdio>
 
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
 
+SDL_Window* window;
+SDL_GLContext context;
+
+TTF_Font* font;
+
+const unsigned long FRAME_TIME = 1000.0 / 60.0;
+unsigned long last_time = SDL_GetTicks();
+unsigned long last_second = SDL_GetTicks();
+unsigned int frames = 0;
+unsigned int fps = 0;
+
+unsigned int shader;
+
+bool init();
+
 int main() {
-    // Init everything
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        printf("Error initializing SDL: %s\n", SDL_GetError());
-        return -1;
-    }
-
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-
-    SDL_GL_LoadLibrary(NULL);
-
-    SDL_Window* window = SDL_CreateWindow("learngl", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
-    if (window == NULL) {
-        printf("Error creating window: %s\n", SDL_GetError());
-        return -1;
-    }
-
-    SDL_GLContext context = SDL_GL_CreateContext(window);
-    if (context == NULL) {
-        printf("Error creating gl context: %s\n", SDL_GetError());
-        return -1;
-    }
-
-    gladLoadGLLoader(SDL_GL_GetProcAddress);
-    printf("Initialized OpenGL. Vendor %s\nRenderer %s\nVersion%s\n", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
-
-    if (glGenVertexArrays == NULL) {
-        printf("glGenVertexArrays is null \n");
-        return -1;
-    }
-
-    unsigned long last_time = SDL_GetTicks();
-
-    stbi_set_flip_vertically_on_load(true);
-    glEnable(GL_DEPTH_TEST);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    unsigned int shader = shader_compile("./shader/vertex.glsl", "./shader/fragment.glsl");
-    unsigned int light_shader = shader_compile("./shader/light_vertex.glsl", "./shader/fragment.glsl");
-
-    int width, height, nr_channels;
-    unsigned int texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    unsigned char* data = stbi_load("./container.jpg", &width, &height, &nr_channels, 0);
-    if (!data) {
-        printf("Failed to load texture\n");
+    if (!init()) {
         return -1;
     }
 
@@ -157,7 +121,7 @@ int main() {
     };
 
     Mesh cube = Mesh(vertices, sizeof(vertices), indices, sizeof(indices));
-     Mesh ship = Mesh(ship_vertices, sizeof(ship_vertices), ship_indices, sizeof(ship_indices));
+    Mesh ship = Mesh(ship_vertices, sizeof(ship_vertices), ship_indices, sizeof(ship_indices));
 
     glm::vec3 camera_position = glm::vec3(0.0f, 0.0f, 3.0f);
     glm::vec3 camera_move_direction = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -176,6 +140,17 @@ int main() {
         unsigned long current_time = SDL_GetTicks();
         float delta = (float)(current_time - last_time) / 60.0f;
         last_time = current_time;
+
+        if (current_time - last_second >= 1000) {
+            fps = frames;
+            frames = 0;
+            last_second += 1000;
+        }
+
+        if (current_time - last_time < FRAME_TIME) {
+            unsigned long delay_time = FRAME_TIME - (current_time - last_time);
+            SDL_Delay(delay_time);
+        }
 
         SDL_Event e;
         while (SDL_PollEvent(&e) != 0) {
@@ -261,25 +236,99 @@ int main() {
         model = glm::rotate(model, glm::radians(model_rotation.y), glm::vec3(1.0f, 0.0f, 0.0f));
         glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
         cube.draw(shader);
-        // cube.draw(shader);
-        //
-        glUseProgram(light_shader);
 
-        glm::mat4 light_model = glm::mat4(1.0f);
-        light_model = glm::scale(light_model, glm::vec3(0.3f));
-        light_model = glm::translate(light_model, light_pos);
-        glUniformMatrix4fv(glGetUniformLocation(light_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(light_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(glGetUniformLocation(light_shader, "model"), 1, GL_FALSE, glm::value_ptr(light_model));
-        cube.draw(light_shader);
+        char fps_text[10];
+        sprintf(fps_text, "FPS: %i", fps);
+        SDL_Surface* text_surface = TTF_RenderUTF8_Blended(font, fps_text, (SDL_Color) { .r = 255, .g = 255, .b = 255, .a = 255 });
+
+        unsigned int colors = text_surface->format->BytesPerPixel;
+        unsigned int texture_format;
+        unsigned int texture;
+        if (colors == 4) {   // alpha
+            if (text_surface->format->Rmask == 0x000000ff)
+                texture_format = GL_RGBA;
+            else
+                texture_format = GL_BGRA;
+        } else {             // no alpha
+            if (text_surface->format->Rmask == 0x000000ff)
+                texture_format = GL_RGB;
+            else
+                texture_format = GL_BGR;
+        }
+
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, colors, text_surface->w, text_surface->h, 0, texture_format, GL_UNSIGNED_BYTE, text_surface->pixels);
+
+        unsigned int fbo;
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+        glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glBlitFramebuffer(0, 0, text_surface->w, text_surface->h, 0, 0, text_surface->w, text_surface->h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
         SDL_GL_SwapWindow(window);
+        frames++;
     }
 
     // Quit everything
     SDL_DestroyWindow(window);
 
+    TTF_CloseFont(font);
+
+    TTF_Quit();
     SDL_Quit();
 
     return 0;
+}
+
+bool init() {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        printf("Error initializing SDL: %s\n", SDL_GetError());
+        return false;
+    }
+
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+
+    SDL_GL_LoadLibrary(NULL);
+
+    window = SDL_CreateWindow("learngl", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
+    if (window == NULL) {
+        printf("Error creating window: %s\n", SDL_GetError());
+        return false;
+    }
+
+    if(TTF_Init() == -1){
+        printf("Unable to initialize SDL_ttf! SDL Error: %s\n", TTF_GetError());
+        return false;
+    }
+
+    context = SDL_GL_CreateContext(window);
+    if (context == NULL) {
+        printf("Error creating gl context: %s\n", SDL_GetError());
+        return false;
+    }
+
+    gladLoadGLLoader(SDL_GL_GetProcAddress);
+    printf("Initialized OpenGL. Vendor %s\nRenderer %s\nVersion%s\n", glGetString(GL_VENDOR), glGetString(GL_RENDERER), glGetString(GL_VERSION));
+
+    if (glGenVertexArrays == NULL) {
+        printf("glGenVertexArrays is null \n");
+        return false;
+    }
+
+    stbi_set_flip_vertically_on_load(true);
+    glEnable(GL_DEPTH_TEST);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    shader = shader_compile("./shader/vertex.glsl", "./shader/fragment.glsl");
+
+    font = TTF_OpenFont("./hack.ttf", 8);
+    if (font == NULL) {
+        printf("Unable to initalize font! SDL Error: %s\n", TTF_GetError());
+    }
+
+    return true;
 }

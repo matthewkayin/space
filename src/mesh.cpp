@@ -1,8 +1,11 @@
 #include "mesh.hpp"
 
 #include <glad/glad.h>
+#include <glm/gtc/type_ptr.hpp>
 
 Mesh::Mesh(const float* vertex_positions, unsigned int vertex_positions_size, const unsigned int* indices, unsigned int indices_size) {
+    color = glm::vec3(1.0f, 1.0f, 1.0f);
+
     // Per vertex shading
     for (unsigned int i = 0; i < (vertex_positions_size / sizeof(float)) / 3; i++) {
         glm::vec3 position = glm::vec3(vertex_positions[i * 3], vertex_positions[(i * 3) + 1], vertex_positions[(i * 3) + 2]);
@@ -55,26 +58,13 @@ Mesh::Mesh(const float* vertex_positions, unsigned int vertex_positions_size, co
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
 
-    /*
-
-    // vertex texture coordinates
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, tex_coords));
-    */
-
     glBindVertexArray(0);
 }
 
 void Mesh::draw(unsigned int shader) {
-    /*for (unsigned int i = 0; i < textures.size(); i++) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glUniform1i(glGetUniformLocation(shader, ("texture" + std::to_string(i + 1)).c_str()), i);
-        glBindTexture(GL_TEXTURE_2D, textures[i]);
-    }*/
+    glUniform3fv(glGetUniformLocation(shader, "object_color"), 1, glm::value_ptr(color));
 
     glBindVertexArray(vao);
     glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
-
-    // glActiveTexture(GL_TEXTURE0);
 }

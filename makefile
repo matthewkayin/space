@@ -2,7 +2,7 @@ C = g++
 CFLAGS = -Wall -std=c++11
 DBGFLAGS = -g
 IFLAGS = -Iinclude -I/usr/local/include/
-LFLAGS = -lSDL2 -lSDL2_image -lSDL2_ttf -lm -lassimp
+LFLAGS = -lSDL2 -lSDL2_image -lSDL2_ttf -lm -lfreetype
 TARGET = game
 SRCSDIR = src
 OBJSDIR = obj

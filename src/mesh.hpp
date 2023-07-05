@@ -14,7 +14,7 @@ struct Mesh {
 
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
-    // std::vector<unsigned int> textures;
+    glm::vec3 color;
 
     Mesh(const float* vertex_positions, unsigned int vertex_positions_size, const unsigned int* indices, unsigned int indices_size);
     void draw(unsigned int shader);

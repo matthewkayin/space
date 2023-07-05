@@ -12,9 +12,9 @@ uniform mat4 projection;
 
 uniform vec3 light_pos;
 uniform vec3 view_pos;
+uniform vec3 object_color;
 
 void main() {
-    vec4 object_color = vec4(1.0, 1.0, 1.0, 1.0);
     vec4 light_color = vec4(1.0, 1.0, 1.0, 1.0);
 
     vec3 frag_pos = vec3(model * vec4(a_pos, 1.0));
@@ -30,6 +30,6 @@ void main() {
     vec3 reflect_direction = reflect(-light_direction, norm);
     vec4 specular = 0.5 * pow(max(dot(view_direction, reflect_direction), 0.0), 32) * light_color;
 
-    frag_color = (ambient + diffuse + specular) * object_color;
+    frag_color = (ambient + diffuse + specular) * vec4(object_color, 1.0);
     gl_Position = projection * view * model * vec4(a_pos, 1.0);
 }
