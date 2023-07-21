@@ -1,9 +1,11 @@
 #version 410 core
 layout (location = 0) in vec3 a_pos;
 layout (location = 1) in vec3 a_normal;
-layout (location = 2) in vec2 texture_coordinates;
+layout (location = 2) in int a_texture_index;
+layout (location = 3) in vec2 a_texture_coordinate;
 
-out vec4 frag_color;
+flat out int texture_index;
+out vec2 texture_coordinate;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -11,8 +13,6 @@ uniform mat4 projection;
 
 uniform vec3 light_pos;
 uniform vec3 view_pos;
-
-uniform sampler2D atlas;
 
 void main() {
     vec3 light_color = vec3(1.0, 1.0, 1.0);
@@ -35,7 +35,10 @@ void main() {
     float light_quadratic = 0.0019;
     float attenuation = 1.0 / (light_constant + (light_linear * frag_distance) + (light_quadratic * frag_distance * frag_distance));
 
-    vec3 sampled = texture(atlas, texture_coordinates).rgb;
-    frag_color = vec4((ambient + diffuse + specular) * attenuation * sampled, 1.0);
+    texture_index = a_texture_index;
+    texture_coordinate = a_texture_coordinate;
+    // frag_color = texture(atlas, a_tex_coord);
+    // frag_color = vec4((ambient + diffuse + specular) * attenuation * sampled, 1.0);
+    // frag_color = vec4(sampled, 1.0);
     gl_Position = projection * view * model * vec4(a_pos, 1.0);
 }

@@ -11,16 +11,18 @@ const int TEXTURE_SIZE = 64;
 void Level::load_texture_atlas() {
     glGenTextures(1, &texture_atlas);
     glBindTexture(GL_TEXTURE_2D, texture_atlas);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_S);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_TEXTURE_WRAP_T);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     int width, height, num_channels;
     unsigned char* data = stbi_load("./res/textures.png", &width, &height, &num_channels, 0);
     if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
         texture_atlas_count = glm::ivec2(width / TEXTURE_SIZE, height / TEXTURE_SIZE);
-        texture_coordinate_step = glm::vec2(1.0 / (float)texture_atlas_count.x, 1.0 / (float)texture_atlas_count.y);
+        texture_coordinate_step = glm::vec2(1.0f / (float)texture_atlas_count.x, 1.0f / (float)texture_atlas_count.y);
     } else {
         printf("Failed to load texture atlas\n");
     }
@@ -30,7 +32,7 @@ void Level::load_texture_atlas() {
 glm::vec2 Level::get_texture_coordinates(unsigned int texture_index) {
     glm::vec2 texture_index_2d = glm::vec2(texture_index % texture_atlas_count.x, (int)(texture_index / (float)texture_atlas_count.x));
     if (texture_index_2d.x >= texture_atlas_count.x || texture_index_2d.y >= texture_atlas_count.y) {
-        texture_index_2d = glm::vec2(0, 0);
+        texture_index_2d = glm::vec2(0.0f, 0.0f);
     }
 
     return texture_index_2d;
@@ -68,13 +70,13 @@ void Level::init() {
 
         glm::vec2 texture_index_origin = get_texture_coordinates(0);
         glm::vec2 texture_coordinate_offsets[6] = {
-            glm::vec2(0.0, texture_coordinate_step.y),
-            glm::vec2(texture_coordinate_step.x, texture_coordinate_step.y),
-            glm::vec2(0.0, 0.0),
+            glm::vec2(0.0f, 2.0f),
+            glm::vec2(2.0f, 2.0f),
+            glm::vec2(0.0f, 0.0f),
 
-            glm::vec2(texture_coordinate_step.x, texture_coordinate_step.y),
-            glm::vec2(texture_coordinate_step.x, 0.0),
-            glm::vec2(0.0, 0.0),
+            glm::vec2(2.0f, 2.0f),
+            glm::vec2(2.0f, 0.0f),
+            glm::vec2(0.0f, 0.0f)
         };
 
         for (unsigned int face = 0; face < 2; face++) {
@@ -82,10 +84,11 @@ void Level::init() {
             glm::vec3 face_normal = glm::normalize(glm::cross(wall_vertices[base_index + 2] - wall_vertices[base_index], wall_vertices[base_index + 1] - wall_vertices[base_index]));
 
             for (unsigned int j = 0; j < 3; j++) {
-                vertex_data.push_back(VertexData {
+                vertex_data.push_back({
                     .position = wall_vertices[base_index + j],
                     .normal = face_normal,
-                    .texture_coordinates = texture_index_origin + texture_coordinate_offsets[base_index + j]
+                    .texture_index = 0,
+                    .texture_coordinates = texture_index_origin + (texture_coordinate_offsets[base_index + j])
                 });
             }
         }
@@ -100,10 +103,11 @@ void Level::init() {
         };
         glm::vec3 face_normal = glm::normalize(glm::cross(triangle_vertices[1] - triangle_vertices[0], triangle_vertices[2] - triangle_vertices[0]));
         for (unsigned int j = 0; j < 3; j++) {
-            vertex_data.push_back(VertexData {
+            vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
-                .texture_coordinates = glm::vec2(0.0, 0.0)
+                .texture_index = 0,
+                .texture_coordinates = glm::vec2(0.0f, 0.0f)
             });
         }
 
@@ -112,10 +116,11 @@ void Level::init() {
         }
         face_normal = glm::normalize(glm::cross(triangle_vertices[2] - triangle_vertices[0], triangle_vertices[1] - triangle_vertices[0]));
         for (unsigned int j = 0; j < 3; j++) {
-            vertex_data.push_back(VertexData {
+            vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
-                .texture_coordinates = glm::vec2(0.0, 0.0)
+                .texture_index = 0,
+                .texture_coordinates = glm::vec2(0.0f, 0.0f)
             });
         }
     }
@@ -135,7 +140,10 @@ void Level::init() {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)(3 * sizeof(float)));
 
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)(2 * sizeof(float)));
+    glVertexAttribIPointer(2, 1, GL_INT, sizeof(VertexData), (void*)(6 * sizeof(float)));
+
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)((6 * sizeof(float) + sizeof(int))));
 
     glBindVertexArray(0);
 }
@@ -143,7 +151,13 @@ void Level::init() {
 void Level::render(unsigned int shader) {
     /*glm::vec3 white = glm::vec3(1.0f, 1.0f, 1.0f);
     glUniform3fv(glGetUniformLocation(shader, "object_color"), 1, glm::value_ptr(white));*/
-    glUniform1i(glGetUniformLocation(shader, "atlas"), texture_atlas);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture_atlas);
+    glUniform1i(glGetUniformLocation(shader, "atlas"), 0);
+    glm::vec2 atlas_step = glm::vec2(0.5f, 1.0f);
+    glUniform2fv(glGetUniformLocation(shader, "atlas_step"), 1, glm::value_ptr(atlas_step));
+    glm::ivec2 atlas_count = glm::ivec2(2, 1);
+    glUniform2iv(glGetUniformLocation(shader, "atlas_count"), 1, glm::value_ptr(atlas_count));
 
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, vertex_data.size());

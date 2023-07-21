@@ -6,6 +6,7 @@
 struct VertexData {
     glm::vec3 position;
     glm::vec3 normal;
+    int texture_index;
     glm::vec2 texture_coordinates;
 };
 
