@@ -33,6 +33,11 @@ Mesh::Mesh(const float* vertex_positions, unsigned int vertex_positions_size, co
         }
     }
 
+    for (unsigned int i = 0; i < vertices.size(); i++) {
+        vertices[i].normal = glm::normalize(vertices[i].normal);
+        printf("%f %f %f\n", vertices[i].normal.x, vertices[i].normal.y, vertices[i].normal.z);
+    }
+
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
     glGenBuffers(1, &ebo);

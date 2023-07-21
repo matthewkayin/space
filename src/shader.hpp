@@ -4,4 +4,4 @@
 
 #include <string>
 
-unsigned int shader_compile(const char* vertex_path, const char* fragment_path);
+bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragment_path);

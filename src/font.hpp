@@ -15,4 +15,4 @@ struct Font {
 
 extern Font font_hack_10pt;
 
-void font_init();
+bool font_init();

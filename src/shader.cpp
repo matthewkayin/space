@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <sstream>
 
-unsigned int shader_compile(const char* vertex_path, const char* fragment_path) {
+bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragment_path) {
     std::string vertex_code;
     std::string fragment_code;
     std::ifstream vertex_shader_file;
@@ -33,6 +33,7 @@ unsigned int shader_compile(const char* vertex_path, const char* fragment_path) 
         fragment_code = fragment_shader_stream.str();
     } catch (std::ifstream::failure e) {
         printf("Error: shader file not successfully read\n");
+        return false;
     }
 
     const char* vertex_shader_code = vertex_code.c_str();
@@ -50,6 +51,7 @@ unsigned int shader_compile(const char* vertex_path, const char* fragment_path) 
     if (!success) {
         glGetShaderInfoLog(vertex, 512, NULL, info_log);
         printf("Error: vertex shader compilation failed\n%s\n", info_log);
+        return false;
     }
 
     fragment = glCreateShader(GL_FRAGMENT_SHADER);
@@ -59,6 +61,7 @@ unsigned int shader_compile(const char* vertex_path, const char* fragment_path) 
     if (!success) {
         glGetShaderInfoLog(fragment, 512, NULL, info_log);
         printf("Error: fragment shader compilation failed\n%s\n", info_log);
+        return false;
     }
 
     unsigned int program = glCreateProgram();
@@ -69,10 +72,12 @@ unsigned int shader_compile(const char* vertex_path, const char* fragment_path) 
     if (!success) {
         glGetProgramInfoLog(program, 512, NULL, info_log);
         printf("Error linking shader program\n%s\n", info_log);
+        return false;
     }
 
     glDeleteShader(vertex);
     glDeleteShader(fragment);
 
-    return program;
+    *id = program;
+    return true;
 }
