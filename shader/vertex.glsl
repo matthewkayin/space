@@ -4,6 +4,7 @@ layout (location = 1) in vec3 a_normal;
 layout (location = 2) in vec2 a_texture_coordinate;
 
 out vec2 texture_coordinate;
+out vec4 lighting_color;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -34,8 +35,6 @@ void main() {
     float attenuation = 1.0 / (light_constant + (light_linear * frag_distance) + (light_quadratic * frag_distance * frag_distance));
 
     texture_coordinate = a_texture_coordinate;
-    // frag_color = texture(atlas, a_tex_coord);
-    // frag_color = vec4((ambient + diffuse + specular) * attenuation * sampled, 1.0);
-    // frag_color = vec4(sampled, 1.0);
+    lighting_color = vec4((ambient + diffuse + specular) * attenuation, 1.0);
     gl_Position = projection * view * model * vec4(a_pos, 1.0);
 }

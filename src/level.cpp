@@ -15,13 +15,11 @@ void Level::init() {
     glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
 
     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, 64, 64, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    printf("error? %i\n", glGetError());
     const char* paths[2] = { "./res/texture/BRICK_1A.png", "./res/texture/CONSOLE_1B.png" };
     for (unsigned int i = 0; i < 2; i++) {
         int width, height, num_channels;
         unsigned char* data = stbi_load(paths[i], &width, &height, &num_channels, 0);
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, 64, 64, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        printf("error? %i\n", glGetError());
         stbi_image_free(data);
     }
 
@@ -59,13 +57,14 @@ void Level::init() {
             wall_bot_left
         };
 
-        glm::vec2 texture_coordinate_offsets[6] = {
-            glm::vec2(0.0f, 2.0f),
-            glm::vec2(2.0f, 2.0f),
+        glm::vec2 wall_scale = glm::vec2(glm::length(vertices[i] - vertices[end_index]), std::fabs(ceiling_y - floor_y));
+        glm::vec2 texture_coordinates[6] = {
+            glm::vec2(0.0f, wall_scale.y),
+            glm::vec2(wall_scale.x, wall_scale.y),
             glm::vec2(0.0f, 0.0f),
 
-            glm::vec2(2.0f, 2.0f),
-            glm::vec2(2.0f, 0.0f),
+            glm::vec2(wall_scale.x, wall_scale.y),
+            glm::vec2(wall_scale.x, 0.0f),
             glm::vec2(0.0f, 0.0f)
         };
 
@@ -77,13 +76,24 @@ void Level::init() {
                 vertex_data.push_back({
                     .position = wall_vertices[base_index + j],
                     .normal = face_normal,
-                    .texture_coordinates = texture_coordinate_offsets[base_index + j]
+                    .texture_coordinates = texture_coordinates[base_index + j]
                 });
             }
         }
     }
 
     // ceiling and floor
+    float ceiling_texture_top = vertices[0].y;
+    float ceiling_texture_left = vertices[0].x;
+    float ceiling_texture_bot = vertices[0].y;
+    float ceiling_texture_right = vertices[0].x;
+    for (unsigned int i = 1; i < vertices.size(); i++) {
+        ceiling_texture_left = std::min(ceiling_texture_left, vertices[i].x);
+        ceiling_texture_top = std::min(ceiling_texture_top, vertices[i].y);
+        ceiling_texture_right = std::max(ceiling_texture_right, vertices[i].x);
+        ceiling_texture_bot = std::max(ceiling_texture_bot, vertices[i].y);
+    }
+    glm::vec2 ceiling_scale = glm::vec2(std::fabs(ceiling_texture_right - ceiling_texture_left), std::fabs(ceiling_texture_top - ceiling_texture_bot));
     for (unsigned int i = 2; i < vertices.size(); i++) {
         glm::vec3 triangle_vertices[3] = {
             glm::vec3(vertices[0].x, ceiling_y, vertices[0].y),
@@ -95,7 +105,9 @@ void Level::init() {
             vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
-                .texture_coordinates = glm::vec2(0.0f, 0.0f)
+                .texture_coordinates = glm::vec2(
+                        ((triangle_vertices[j].x - ceiling_texture_left) / ceiling_scale.x) * ceiling_scale.x,
+                        (std::fabs(triangle_vertices[j].z - ceiling_texture_bot) / ceiling_scale.y) * ceiling_scale.y)
             });
         }
 
@@ -107,7 +119,9 @@ void Level::init() {
             vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
-                .texture_coordinates = glm::vec2(0.0f, 0.0f)
+                .texture_coordinates = glm::vec2(
+                        ((triangle_vertices[j].x - ceiling_texture_left) / ceiling_scale.x) * ceiling_scale.x,
+                        (std::fabs(triangle_vertices[j].z - ceiling_texture_bot) / ceiling_scale.y) * ceiling_scale.y)
             });
         }
     }
