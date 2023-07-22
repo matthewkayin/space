@@ -1,10 +1,8 @@
 #version 410 core
 layout (location = 0) in vec3 a_pos;
 layout (location = 1) in vec3 a_normal;
-layout (location = 2) in int a_texture_index;
-layout (location = 3) in vec2 a_texture_coordinate;
+layout (location = 2) in vec2 a_texture_coordinate;
 
-flat out int texture_index;
 out vec2 texture_coordinate;
 
 uniform mat4 model;
@@ -35,7 +33,6 @@ void main() {
     float light_quadratic = 0.0019;
     float attenuation = 1.0 / (light_constant + (light_linear * frag_distance) + (light_quadratic * frag_distance * frag_distance));
 
-    texture_index = a_texture_index;
     texture_coordinate = a_texture_coordinate;
     // frag_color = texture(atlas, a_tex_coord);
     // frag_color = vec4((ambient + diffuse + specular) * attenuation * sampled, 1.0);

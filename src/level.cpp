@@ -8,38 +8,29 @@
 
 const int TEXTURE_SIZE = 64;
 
-void Level::load_texture_atlas() {
-    glGenTextures(1, &texture_atlas);
-    glBindTexture(GL_TEXTURE_2D, texture_atlas);
-    int width, height, num_channels;
-    unsigned char* data = stbi_load("./res/textures.png", &width, &height, &num_channels, 0);
-    if (data) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-        texture_atlas_count = glm::ivec2(width / TEXTURE_SIZE, height / TEXTURE_SIZE);
-        texture_coordinate_step = glm::vec2(1.0f / (float)texture_atlas_count.x, 1.0f / (float)texture_atlas_count.y);
-    } else {
-        printf("Failed to load texture atlas\n");
-    }
-    stbi_image_free(data);
-}
-
-glm::vec2 Level::get_texture_coordinates(unsigned int texture_index) {
-    glm::vec2 texture_index_2d = glm::vec2(texture_index % texture_atlas_count.x, (int)(texture_index / (float)texture_atlas_count.x));
-    if (texture_index_2d.x >= texture_atlas_count.x || texture_index_2d.y >= texture_atlas_count.y) {
-        texture_index_2d = glm::vec2(0.0f, 0.0f);
-    }
-
-    return texture_index_2d;
-}
-
 void Level::init() {
-    load_texture_atlas();
+    // load texture array
+    glGenTextures(1, &texture_array);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
+
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, 64, 64, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    printf("error? %i\n", glGetError());
+    const char* paths[2] = { "./res/texture/BRICK_1A.png", "./res/texture/CONSOLE_1B.png" };
+    for (unsigned int i = 0; i < 2; i++) {
+        int width, height, num_channels;
+        unsigned char* data = stbi_load(paths[i], &width, &height, &num_channels, 0);
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, 64, 64, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        printf("error? %i\n", glGetError());
+        stbi_image_free(data);
+    }
+
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_LINEAR);
 
     std::vector<glm::vec2> vertices;
     vertices.push_back(glm::vec2(-3.0f, -1.0f));
@@ -68,7 +59,6 @@ void Level::init() {
             wall_bot_left
         };
 
-        glm::vec2 texture_index_origin = get_texture_coordinates(0);
         glm::vec2 texture_coordinate_offsets[6] = {
             glm::vec2(0.0f, 2.0f),
             glm::vec2(2.0f, 2.0f),
@@ -87,8 +77,7 @@ void Level::init() {
                 vertex_data.push_back({
                     .position = wall_vertices[base_index + j],
                     .normal = face_normal,
-                    .texture_index = 0,
-                    .texture_coordinates = texture_index_origin + (texture_coordinate_offsets[base_index + j])
+                    .texture_coordinates = texture_coordinate_offsets[base_index + j]
                 });
             }
         }
@@ -106,7 +95,6 @@ void Level::init() {
             vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
-                .texture_index = 0,
                 .texture_coordinates = glm::vec2(0.0f, 0.0f)
             });
         }
@@ -119,7 +107,6 @@ void Level::init() {
             vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
-                .texture_index = 0,
                 .texture_coordinates = glm::vec2(0.0f, 0.0f)
             });
         }
@@ -140,24 +127,15 @@ void Level::init() {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)(3 * sizeof(float)));
 
     glEnableVertexAttribArray(2);
-    glVertexAttribIPointer(2, 1, GL_INT, sizeof(VertexData), (void*)(6 * sizeof(float)));
-
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)((6 * sizeof(float) + sizeof(int))));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)(6 * sizeof(float)));
 
     glBindVertexArray(0);
 }
 
 void Level::render(unsigned int shader) {
-    /*glm::vec3 white = glm::vec3(1.0f, 1.0f, 1.0f);
-    glUniform3fv(glGetUniformLocation(shader, "object_color"), 1, glm::value_ptr(white));*/
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture_atlas);
-    glUniform1i(glGetUniformLocation(shader, "atlas"), 0);
-    glm::vec2 atlas_step = glm::vec2(0.5f, 1.0f);
-    glUniform2fv(glGetUniformLocation(shader, "atlas_step"), 1, glm::value_ptr(atlas_step));
-    glm::ivec2 atlas_count = glm::ivec2(2, 1);
-    glUniform2iv(glGetUniformLocation(shader, "atlas_count"), 1, glm::value_ptr(atlas_count));
+    glBindTexture(GL_TEXTURE_2D, texture_array);
+    glUniform1i(glGetUniformLocation(shader, "texture_array"), 0);
 
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, vertex_data.size());
