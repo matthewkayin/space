@@ -16,10 +16,18 @@ struct CollisionTriangle {
     glm::vec3 a;
     glm::vec3 b;
     glm::vec3 c;
+    glm::vec3 normal;
+    glm::vec3 unit_u;
+    glm::vec3 unit_v;
+    float w;
+    float g;
+    float h;
+    CollisionTriangle(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, glm::vec3 p_normal);
 };
 
 struct Sector {
     std::vector<glm::vec2> vertices;
+    unsigned int vertex_data_size;
     float floor_y;
     float ceiling_y;
     std::vector<VertexData> vertex_data;
@@ -28,7 +36,7 @@ struct Sector {
 
     Sector();
     void init_buffers();
-    bool is_point_colliding(const glm::vec3 point) const;
+    float collision_check(const glm::vec3 point, const glm::vec3 velocity) const;
     void render(unsigned int shader);
 };
 

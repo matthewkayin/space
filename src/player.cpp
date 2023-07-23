@@ -56,5 +56,4 @@ void Player::update(float delta) {
     if (input.is_action_pressed[INPUT_DOWN]) {
         velocity -= glm::vec3(basis[1]) * 0.01f;
     }
-    position += velocity * delta;
 }

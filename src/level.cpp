@@ -10,6 +10,34 @@
 
 const int TEXTURE_SIZE = 64;
 
+CollisionTriangle::CollisionTriangle(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, glm::vec3 p_normal) {
+    normal = p_normal;
+
+    float length01 = glm::length(v1 - v0);
+    float length12 = glm::length(v2 - v1);
+    float length20 = glm::length(v0 - v2);
+
+    if (length01 >= length12 && length01 >= length20) {
+        a = v0;
+        b = v1;
+        c = v2;
+    } else if (length12 >= length20) {
+        a = v1;
+        b = v2;
+        c = v0;
+    } else {
+        a = v2;
+        b = v0;
+        c = v1;
+    }
+
+    unit_u = glm::normalize(b - a);
+    unit_v = glm::normalize((c - a) - (unit_u * glm::dot(unit_u, c - a)));
+    w = glm::length(b - a);
+    g = glm::dot(unit_u, c - a);
+    h = glm::dot(unit_v, c - a);
+}
+
 Sector::Sector() {
     vertices.push_back(glm::vec2(-3.0f, -1.0f));
     vertices.push_back(glm::vec2(0.0f, -5.0f));
@@ -62,11 +90,12 @@ void Sector::init_buffers() {
                     .texture_coordinates = texture_coordinates[base_index + j]
                 });
             }
-            collision_triangles.push_back({
-                .a = wall_vertices[base_index + 0],
-                .b = wall_vertices[base_index + 1],
-                .c = wall_vertices[base_index + 2],
-            });
+            collision_triangles.push_back(CollisionTriangle(
+                wall_vertices[base_index + 0],
+                wall_vertices[base_index + 1],
+                wall_vertices[base_index + 2],
+                face_normal
+            ));
         }
     }
 
@@ -99,11 +128,12 @@ void Sector::init_buffers() {
                         (std::fabs(triangle_vertices[j].z - ceiling_texture_bot) / ceiling_scale.y) * ceiling_scale.y)
             });
         }
-        collision_triangles.push_back({
-            .a = triangle_vertices[0],
-            .b = triangle_vertices[1],
-            .c = triangle_vertices[2],
-        });
+        collision_triangles.push_back(CollisionTriangle(
+            triangle_vertices[0],
+            triangle_vertices[1],
+            triangle_vertices[2],
+            face_normal
+        ));
 
         for (unsigned int j = 0; j < 3; j++) {
             triangle_vertices[j].y = floor_y;
@@ -119,11 +149,12 @@ void Sector::init_buffers() {
                         (std::fabs(triangle_vertices[j].z - ceiling_texture_bot) / ceiling_scale.y) * ceiling_scale.y)
             });
         }
-        collision_triangles.push_back({
-            .a = triangle_vertices[0],
-            .b = triangle_vertices[1],
-            .c = triangle_vertices[2],
-        });
+        collision_triangles.push_back(CollisionTriangle(
+            triangle_vertices[0],
+            triangle_vertices[1],
+            triangle_vertices[2],
+            face_normal
+        ));
     }
 
     glGenVertexArrays(1, &vao);
@@ -147,39 +178,47 @@ void Sector::init_buffers() {
     glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)((6 * sizeof(float)) + sizeof(unsigned int)));
 
     glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    // vertex_data.clear();
+    vertex_data_size = vertex_data.size();
+    vertex_data.clear();
 }
 
-bool Sector::is_point_colliding(const glm::vec3 point) const {
+float Sector::collision_check(const glm::vec3 point, const glm::vec3 velocity) const {
     // TODO check point against an AABB to see if it's within the sector
 
-    for (const CollisionTriangle& triangle : collision_triangles) {
-        glm::vec3 u = triangle.b - triangle.a;
-        glm::vec3 v = triangle.c - triangle.a;
-        glm::vec3 n = glm::cross(u, v);
-        glm::vec3 w = point - triangle.a;
-        float n2 = glm::dot(n, n);
-        float gamma = glm::dot(glm::cross(u, w), n) / n2;
-        float beta = glm::dot(glm::cross(w, w), n) / n2;
-        float alpha = 1 - gamma - beta;
-        glm::vec3 point_onto_triangle = (alpha * triangle.a) + (beta * triangle.b) + (gamma * triangle.c);
+    glm::vec3 direction = glm::normalize(velocity);
 
-        if (length(point - point_onto_triangle) > 0.2f) {
+    for (const CollisionTriangle& triangle : collision_triangles) {
+        // check that direction is not perpendicular to triangle normal
+        float d_dot_n = glm::dot(direction, triangle.normal);
+        if (d_dot_n == 0.0f) {
             continue;
         }
 
-        if (alpha >= 0 and alpha <= 1 and beta >= 0 and beta <= 1 and gamma >= 0 and gamma <= 1) {
-            return true;
+        // check whether ray intersects with triangle plane
+        float nd = glm::dot(triangle.normal, triangle.a - point);
+        float t = (nd - glm::dot(point, triangle.normal)) / d_dot_n;
+        if (t < 0) {
+            continue;
         }
-    }
 
-    return false;
+        float u = glm::dot(triangle.unit_u, point - triangle.a);
+        float v = glm::dot(triangle.unit_v, point - triangle.a);
+        if (u < 0 || u > triangle.w || v < 0 || v > triangle.w ||
+            (u <= triangle.g && v > u * (triangle.h / triangle.g)) ||
+            (u >= triangle.g && v > triangle.w - (u * (triangle.h / (triangle.w - triangle.g))))) {
+            continue;
+        }
+
+        return std::min(t, glm::length(velocity));
+    }
+    return glm::length(velocity);
 }
 
 void Sector::render(unsigned int shader) {
     glBindVertexArray(vao);
-    glDrawArrays(GL_TRIANGLES, 0, vertex_data.size());
+    glDrawArrays(GL_TRIANGLES, 0, vertex_data_size);
     glBindVertexArray(0);
 }
 
@@ -222,9 +261,11 @@ bool Level::init() {
 
 void Level::update(float delta) {
     player.update(delta);
-    if (sector.is_point_colliding(player.position)) {
-        player.position -= player.velocity * delta;
-        player.velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+
+    if (glm::length(player.velocity) != 0.0f) {
+        float velocity_length = sector.collision_check(player.position, player.velocity * delta);
+        printf("v %f\n", velocity_length);
+        player.position += player.velocity * velocity_length;
     }
 }
 
