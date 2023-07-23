@@ -2,12 +2,12 @@
     #define SDL_MAIN_HANDLED
 #endif
 
+#include "input.hpp"
 #include "level.hpp"
 #include "globals.hpp"
 #include "shader.hpp"
 #include "font.hpp"
 #include "mesh.hpp"
-#include "texture.hpp"
 
 #include <glad/glad.h>
 #include <SDL2/SDL.h>
@@ -28,8 +28,6 @@ unsigned long last_time = SDL_GetTicks();
 unsigned long last_second = SDL_GetTicks();
 unsigned int frames = 0;
 unsigned int fps = 0;
-
-unsigned int shader;
 
 int main() {
     // Init engine
@@ -71,12 +69,8 @@ int main() {
     glEnable(GL_BLEND);
 
     // Compile shaders
-    bool success = shader_compile(&shader, "./shader/vertex.glsl", "./shader/fragment.glsl");
-    if (!success) {
-        return -1;
-    }
     unsigned int light_shader;
-    success = shader_compile(&light_shader, "./shader/light_vertex.glsl", "./shader/light_fragment.glsl");
+    bool success = shader_compile(&light_shader, "./shader/light_vertex.glsl", "./shader/light_fragment.glsl");
     if (!success) {
         return -1;
     }
@@ -209,10 +203,12 @@ int main() {
     float pitch = 0.0f;
     float yaw = -90.0f;
 
-    const Uint8* keystate = SDL_GetKeyboardState(NULL);
+    input_set_mapping();
 
     Level level;
-    level.init();
+    if(!level.init()) {
+        return -1;
+    }
 
     // Game loop
     bool running = true;
@@ -234,6 +230,7 @@ int main() {
         }
 
         // Handle input
+        input_prime_state();
         SDL_Event e;
         while (SDL_PollEvent(&e) != 0) {
             if (e.type == SDL_QUIT) {
@@ -246,18 +243,13 @@ int main() {
                 }
             } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == 1 && SDL_GetRelativeMouseMode() == SDL_FALSE) {
                 SDL_SetRelativeMouseMode(SDL_TRUE);
-            } else if (SDL_GetRelativeMouseMode() == SDL_TRUE && e.type == SDL_MOUSEMOTION) {
-                yaw += e.motion.xrel * 0.1f;
-                pitch -= e.motion.yrel * 0.1f;
-                if (pitch > 89.0f) {
-                    pitch = 89.0f;
-                } else if (pitch < -89.0f) {
-                    pitch = -89.0f;
-                }
+            } else if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
+                input_handle_event(e);
             }
         }
 
         // Update
+        level.update(delta);
         glm::vec3 camera_direction = glm::normalize(
                 glm::vec3(
                     cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
@@ -266,6 +258,7 @@ int main() {
 
         camera_move_direction = glm::vec3(0.0f, 0.0f, 0.0f);
         glm::vec3 forward_move_direction = glm::normalize(glm::vec3(camera_direction.x, 0.0f, camera_direction.z));
+        /*
         if (keystate[SDL_SCANCODE_W]) {
             camera_move_direction = forward_move_direction;
         } else if (keystate[SDL_SCANCODE_S]) {
@@ -285,32 +278,33 @@ int main() {
         } else if (keystate[SDL_SCANCODE_E]) {
             camera_position.y += 0.1f;
         }
+        */
 
         // Render
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glBlendFunc(GL_ONE, GL_ZERO);
-        glUseProgram(shader);
+        glUseProgram(level.texture_shader);
 
         glm::vec3 light_pos = glm::vec3(1.0f, 1.5f, -2.0f);
-        glUniform3fv(glGetUniformLocation(shader, "light_pos"), 1, glm::value_ptr(light_pos));
-        glUniform3fv(glGetUniformLocation(shader, "view_pos"), 1, glm::value_ptr(camera_position));
+        glUniform3fv(glGetUniformLocation(level.texture_shader, "light_pos"), 1, glm::value_ptr(light_pos));
+        glUniform3fv(glGetUniformLocation(level.texture_shader, "view_pos"), 1, glm::value_ptr(camera_position));
 
         // view / projection transformations
         glm::mat4 view;
-        view = glm::lookAt(camera_position, camera_position + camera_direction, glm::vec3(0.0f, 1.0f, 0.0f));
+        view = glm::lookAt(level.player.position, level.player.position - glm::vec3(level.player.basis[2]), glm::vec3(level.player.basis[1]));
         glm::mat4 projection;
         projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-        glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(glGetUniformLocation(level.texture_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(level.texture_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
         glm::mat4 model = glm::mat4(1.0f);
-        glUniformMatrix4fv(glGetUniformLocation(shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix4fv(glGetUniformLocation(level.texture_shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
         /*glBindVertexArray(cube_vao);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);*/
-        level.render(shader);
+        level.render();
 
         glm::mat4 light_model = glm::mat4(1.0f);
         light_model = glm::translate(light_model, light_pos);

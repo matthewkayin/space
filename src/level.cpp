@@ -1,5 +1,7 @@
 #include "level.hpp"
 
+#include "shader.hpp"
+
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <stb_image.h>
@@ -8,37 +10,17 @@
 
 const int TEXTURE_SIZE = 64;
 
-void Level::init() {
-    // load texture array
-    glGenTextures(1, &texture_array);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
-
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, 64, 64, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    const char* paths[2] = { "./res/texture/BRICK_1A.png", "./res/texture/CONSOLE_1B.png" };
-    for (unsigned int i = 0; i < 2; i++) {
-        int width, height, num_channels;
-        unsigned char* data = stbi_load(paths[i], &width, &height, &num_channels, 0);
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, 64, 64, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        stbi_image_free(data);
-    }
-
-    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
-
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-
-    std::vector<glm::vec2> vertices;
+Sector::Sector() {
     vertices.push_back(glm::vec2(-3.0f, -1.0f));
     vertices.push_back(glm::vec2(0.0f, -5.0f));
     vertices.push_back(glm::vec2(3.0f, -1.0f));
     vertices.push_back(glm::vec2(3.0f, 5.0f));
     vertices.push_back(glm::vec2(-3.0f, 5.0f));
-    float floor_y = 0.0f;
-    float ceiling_y = 3.0f;
+    floor_y = 0.0f;
+    ceiling_y = 3.0f;
+}
 
+void Sector::init_buffers() {
     // walls
     for (unsigned int i = 0; i < vertices.size(); i++) {
         unsigned int end_index = (i + 1) % vertices.size();
@@ -76,9 +58,15 @@ void Level::init() {
                 vertex_data.push_back({
                     .position = wall_vertices[base_index + j],
                     .normal = face_normal,
+                    .texture_index = 0,
                     .texture_coordinates = texture_coordinates[base_index + j]
                 });
             }
+            collision_triangles.push_back({
+                .a = wall_vertices[base_index + 0],
+                .b = wall_vertices[base_index + 1],
+                .c = wall_vertices[base_index + 2],
+            });
         }
     }
 
@@ -105,11 +93,17 @@ void Level::init() {
             vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
+                .texture_index = 0,
                 .texture_coordinates = glm::vec2(
                         ((triangle_vertices[j].x - ceiling_texture_left) / ceiling_scale.x) * ceiling_scale.x,
                         (std::fabs(triangle_vertices[j].z - ceiling_texture_bot) / ceiling_scale.y) * ceiling_scale.y)
             });
         }
+        collision_triangles.push_back({
+            .a = triangle_vertices[0],
+            .b = triangle_vertices[1],
+            .c = triangle_vertices[2],
+        });
 
         for (unsigned int j = 0; j < 3; j++) {
             triangle_vertices[j].y = floor_y;
@@ -119,11 +113,17 @@ void Level::init() {
             vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
+                .texture_index = 0,
                 .texture_coordinates = glm::vec2(
                         ((triangle_vertices[j].x - ceiling_texture_left) / ceiling_scale.x) * ceiling_scale.x,
                         (std::fabs(triangle_vertices[j].z - ceiling_texture_bot) / ceiling_scale.y) * ceiling_scale.y)
             });
         }
+        collision_triangles.push_back({
+            .a = triangle_vertices[0],
+            .b = triangle_vertices[1],
+            .c = triangle_vertices[2],
+        });
     }
 
     glGenVertexArrays(1, &vao);
@@ -141,17 +141,94 @@ void Level::init() {
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)(3 * sizeof(float)));
 
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)(6 * sizeof(float)));
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(VertexData), (void*)(6 * sizeof(float)));
+
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(VertexData), (void*)((6 * sizeof(float)) + sizeof(unsigned int)));
 
     glBindVertexArray(0);
+
+    // vertex_data.clear();
 }
 
-void Level::render(unsigned int shader) {
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture_array);
-    glUniform1i(glGetUniformLocation(shader, "texture_array"), 0);
+bool Sector::is_point_colliding(const glm::vec3 point) const {
+    // TODO check point against an AABB to see if it's within the sector
 
+    for (const CollisionTriangle& triangle : collision_triangles) {
+        glm::vec3 u = triangle.b - triangle.a;
+        glm::vec3 v = triangle.c - triangle.a;
+        glm::vec3 n = glm::cross(u, v);
+        glm::vec3 w = point - triangle.a;
+        float n2 = glm::dot(n, n);
+        float gamma = glm::dot(glm::cross(u, w), n) / n2;
+        float beta = glm::dot(glm::cross(w, w), n) / n2;
+        float alpha = 1 - gamma - beta;
+        glm::vec3 point_onto_triangle = (alpha * triangle.a) + (beta * triangle.b) + (gamma * triangle.c);
+
+        if (length(point - point_onto_triangle) > 0.2f) {
+            continue;
+        }
+
+        if (alpha >= 0 and alpha <= 1 and beta >= 0 and beta <= 1 and gamma >= 0 and gamma <= 1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void Sector::render(unsigned int shader) {
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, vertex_data.size());
     glBindVertexArray(0);
+}
+
+bool Level::init() {
+    // load texture array
+    glGenTextures(1, &texture_array);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
+
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, 64, 64, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    const char* paths[2] = { "./res/texture/BRICK_1A.png", "./res/texture/CONSOLE_1B.png" };
+    for (unsigned int i = 0; i < 2; i++) {
+        int width, height, num_channels;
+        unsigned char* data = stbi_load(paths[i], &width, &height, &num_channels, 0);
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, 64, 64, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+        stbi_image_free(data);
+    }
+
+    // compile texture shader
+    bool success = shader_compile(&texture_shader, "./shader/texture_vertex.glsl", "./shader/texture_fragment.glsl");
+    if (!success) {
+        return false;
+    }
+    glUseProgram(texture_shader);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture_array);
+    glUniform1i(glGetUniformLocation(texture_shader, "texture_array"), 0);
+
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+
+    sector.init_buffers();
+
+    return true;
+}
+
+void Level::update(float delta) {
+    player.update(delta);
+    if (sector.is_point_colliding(player.position)) {
+        player.position -= player.velocity * delta;
+        player.velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+}
+
+void Level::render() {
+    // glUseProgram(texture_shader);
+    sector.render(texture_shader);
 }

@@ -1,8 +1,10 @@
 #version 410 core
 layout (location = 0) in vec3 a_pos;
 layout (location = 1) in vec3 a_normal;
-layout (location = 2) in vec2 a_texture_coordinate;
+layout (location = 2) in uint a_texture_index;
+layout (location = 3) in vec2 a_texture_coordinate;
 
+flat out uint texture_index;
 out vec2 texture_coordinate;
 out vec4 lighting_color;
 
@@ -34,6 +36,7 @@ void main() {
     float light_quadratic = 0.0019;
     float attenuation = 1.0 / (light_constant + (light_linear * frag_distance) + (light_quadratic * frag_distance * frag_distance));
 
+    texture_index = a_texture_index;
     texture_coordinate = a_texture_coordinate;
     lighting_color = vec4((ambient + diffuse + specular) * attenuation, 1.0);
     gl_Position = projection * view * model * vec4(a_pos, 1.0);
