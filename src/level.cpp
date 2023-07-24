@@ -11,18 +11,24 @@
 const int TEXTURE_SIZE = 64;
 
 Sector::Sector() {
-    vertices.push_back(glm::vec2(-3.0f, -1.0f));
-    vertices.push_back(glm::vec2(0.0f, -5.0f));
-    vertices.push_back(glm::vec2(3.0f, -1.0f));
-    vertices.push_back(glm::vec2(3.0f, 5.0f));
-    vertices.push_back(glm::vec2(-3.0f, 5.0f));
-    floor_y = 0.0f;
-    ceiling_y = 3.0f;
+
+}
+
+void Sector::add_vertex(const glm::vec2 vertex, bool add_wall) {
+    vertices.push_back(vertex);
+    walls.push_back({
+        .exists = add_wall,
+        .normal = glm::vec3(0.0f, 0.0f, 0.0f)
+    });
 }
 
 void Sector::init_buffers() {
     // walls
     for (unsigned int i = 0; i < vertices.size(); i++) {
+        if (!walls[i].exists) {
+            continue;
+        }
+
         unsigned int end_index = (i + 1) % vertices.size();
         glm::vec3 wall_top_left = glm::vec3(vertices[i].x, ceiling_y, vertices[i].y);
         glm::vec3 wall_bot_left = glm::vec3(vertices[i].x, floor_y, vertices[i].y);
@@ -64,7 +70,7 @@ void Sector::init_buffers() {
             }
 
             if (face == 0) {
-                wall_normals.push_back(face_normal);
+                walls[i].normal = face_normal;
             }
         }
     }
@@ -203,11 +209,7 @@ glm::vec3 Sector::get_collision_normal(const glm::vec3& point) const {
             continue;
         }
 
-        collision_normal += wall_normals[wall];
-    }
-
-    if (collision_normal.x != 0.0f || collision_normal.y != 0.0f || collision_normal.z != 0.0f) {
-        collision_normal = glm::normalize(collision_normal);
+        collision_normal += walls[wall].normal;
     }
 
     return collision_normal;
@@ -252,7 +254,28 @@ bool Level::init() {
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_LINEAR);
 
-    sector.init_buffers();
+    Sector a;
+    a.add_vertex(glm::vec2(-3.0f, -1.0f), true);
+    a.add_vertex(glm::vec2(0.0f, -5.0f), false);
+    a.add_vertex(glm::vec2(3.0f, -1.0f), true);
+    a.add_vertex(glm::vec2(3.0f, 5.0f), true);
+    a.add_vertex(glm::vec2(-3.0f, 5.0f), true);
+    a.floor_y = 0.0f;
+    a.ceiling_y = 3.0f;
+    sectors.push_back(a);
+
+    Sector b;
+    b.add_vertex(glm::vec2(3.0f, -9.0f), true);
+    b.add_vertex(glm::vec2(6.0f, -5.0f), true);
+    b.add_vertex(glm::vec2(3.0f, -1.0f), false);
+    b.add_vertex(glm::vec2(0.0f, -5.0f), true);
+    b.floor_y = 0.0f;
+    b.ceiling_y = 3.0f;
+    sectors.push_back(b);
+
+    for (unsigned int i = 0; i < sectors.size(); i++) {
+        sectors[i].init_buffers();
+    }
 
     return true;
 }
@@ -264,13 +287,23 @@ void Level::update(float delta) {
 
     // check collisions
     if (glm::length(player.velocity) != 0.0f) {
-        glm::vec3 collision_normal = sector.get_collision_normal(player.position);
-        glm::vec3 velocity_in_wall_normal_direction = collision_normal * glm::dot(player.velocity * delta, collision_normal);
-        player.position -= velocity_in_wall_normal_direction;
+        glm::vec3 collision_normal = glm::vec3(0.0f, 0.0f, 0.0f);
+        // for (unsigned int i = 0; i < sectors.size(); i++) {
+        collision_normal += sectors[0].get_collision_normal(player.position);
+        printf("%i %f %f %f\n", 0, collision_normal.x, collision_normal.y, collision_normal.z);
+        //}
+
+        if (collision_normal.x != 0.0f || collision_normal.y != 0.0f || collision_normal.z != 0.0f) {
+            collision_normal = glm::normalize(collision_normal);
+            glm::vec3 velocity_in_wall_normal_direction = collision_normal * glm::dot(player.velocity * delta, collision_normal);
+            player.position -= velocity_in_wall_normal_direction;
+        }
     }
 }
 
 void Level::render() {
     // glUseProgram(texture_shader);
-    sector.render(texture_shader);
+    for (unsigned int i = 0; i < sectors.size(); i++) {
+        sectors[i].render(texture_shader);
+    }
 }
