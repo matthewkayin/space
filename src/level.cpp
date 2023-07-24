@@ -10,34 +10,6 @@
 
 const int TEXTURE_SIZE = 64;
 
-CollisionTriangle::CollisionTriangle(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, glm::vec3 p_normal) {
-    normal = p_normal;
-
-    float length01 = glm::length(v1 - v0);
-    float length12 = glm::length(v2 - v1);
-    float length20 = glm::length(v0 - v2);
-
-    if (length01 >= length12 && length01 >= length20) {
-        a = v0;
-        b = v1;
-        c = v2;
-    } else if (length12 >= length20) {
-        a = v1;
-        b = v2;
-        c = v0;
-    } else {
-        a = v2;
-        b = v0;
-        c = v1;
-    }
-
-    unit_u = glm::normalize(b - a);
-    unit_v = glm::normalize((c - a) - (unit_u * glm::dot(unit_u, c - a)));
-    w = glm::length(b - a);
-    g = glm::dot(unit_u, c - a);
-    h = glm::dot(unit_v, c - a);
-}
-
 Sector::Sector() {
     vertices.push_back(glm::vec2(-3.0f, -1.0f));
     vertices.push_back(glm::vec2(0.0f, -5.0f));
@@ -90,27 +62,23 @@ void Sector::init_buffers() {
                     .texture_coordinates = texture_coordinates[base_index + j]
                 });
             }
-            collision_triangles.push_back(CollisionTriangle(
-                wall_vertices[base_index + 0],
-                wall_vertices[base_index + 1],
-                wall_vertices[base_index + 2],
-                face_normal
-            ));
+
+            if (face == 0) {
+                wall_normals.push_back(face_normal);
+            }
         }
     }
 
     // ceiling and floor
-    float ceiling_texture_top = vertices[0].y;
-    float ceiling_texture_left = vertices[0].x;
-    float ceiling_texture_bot = vertices[0].y;
-    float ceiling_texture_right = vertices[0].x;
+    aabb_top_left = vertices[0];
+    aabb_bot_right = vertices[0];
     for (unsigned int i = 1; i < vertices.size(); i++) {
-        ceiling_texture_left = std::min(ceiling_texture_left, vertices[i].x);
-        ceiling_texture_top = std::min(ceiling_texture_top, vertices[i].y);
-        ceiling_texture_right = std::max(ceiling_texture_right, vertices[i].x);
-        ceiling_texture_bot = std::max(ceiling_texture_bot, vertices[i].y);
+        aabb_top_left.x = std::min(aabb_top_left.x, vertices[i].x);
+        aabb_top_left.y = std::min(aabb_top_left.y, vertices[i].y);
+        aabb_bot_right.x = std::max(aabb_bot_right.x, vertices[i].x);
+        aabb_bot_right.y = std::max(aabb_bot_right.y, vertices[i].y);
     }
-    glm::vec2 ceiling_scale = glm::vec2(std::fabs(ceiling_texture_right - ceiling_texture_left), std::fabs(ceiling_texture_top - ceiling_texture_bot));
+    glm::vec2 ceiling_scale = glm::vec2(std::fabs(aabb_bot_right.x - aabb_top_left.x), std::fabs(aabb_top_left.y - aabb_bot_right.y));
     for (unsigned int i = 2; i < vertices.size(); i++) {
         glm::vec3 triangle_vertices[3] = {
             glm::vec3(vertices[0].x, ceiling_y, vertices[0].y),
@@ -124,16 +92,10 @@ void Sector::init_buffers() {
                 .normal = face_normal,
                 .texture_index = 0,
                 .texture_coordinates = glm::vec2(
-                        ((triangle_vertices[j].x - ceiling_texture_left) / ceiling_scale.x) * ceiling_scale.x,
-                        (std::fabs(triangle_vertices[j].z - ceiling_texture_bot) / ceiling_scale.y) * ceiling_scale.y)
+                        ((triangle_vertices[j].x - aabb_top_left.x) / ceiling_scale.x) * ceiling_scale.x,
+                        (std::fabs(triangle_vertices[j].z - aabb_bot_right.y) / ceiling_scale.y) * ceiling_scale.y)
             });
         }
-        collision_triangles.push_back(CollisionTriangle(
-            triangle_vertices[0],
-            triangle_vertices[1],
-            triangle_vertices[2],
-            face_normal
-        ));
 
         for (unsigned int j = 0; j < 3; j++) {
             triangle_vertices[j].y = floor_y;
@@ -145,16 +107,10 @@ void Sector::init_buffers() {
                 .normal = face_normal,
                 .texture_index = 0,
                 .texture_coordinates = glm::vec2(
-                        ((triangle_vertices[j].x - ceiling_texture_left) / ceiling_scale.x) * ceiling_scale.x,
-                        (std::fabs(triangle_vertices[j].z - ceiling_texture_bot) / ceiling_scale.y) * ceiling_scale.y)
+                        ((triangle_vertices[j].x - aabb_top_left.x) / ceiling_scale.x) * ceiling_scale.x,
+                        (std::fabs(triangle_vertices[j].z - aabb_bot_right.y) / ceiling_scale.y) * ceiling_scale.y)
             });
         }
-        collision_triangles.push_back(CollisionTriangle(
-            triangle_vertices[0],
-            triangle_vertices[1],
-            triangle_vertices[2],
-            face_normal
-        ));
     }
 
     glGenVertexArrays(1, &vao);
@@ -184,37 +140,79 @@ void Sector::init_buffers() {
     vertex_data.clear();
 }
 
-float Sector::collision_check(const glm::vec3 point, const glm::vec3 velocity) const {
-    // TODO check point against an AABB to see if it's within the sector
+float raycast(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm::vec2 b_direction) {
+    glm::vec2 b_minus_a = b_origin - a_origin;
+    float a_direction_cross_b_direction = (a_direction.x * b_direction.y) - (a_direction.y * b_direction.x);
 
-    glm::vec3 direction = glm::normalize(velocity);
+    float a_time = ((b_minus_a.x * b_direction.y) - (b_minus_a.y * b_direction.x)) / a_direction_cross_b_direction;
+    float b_time = ((b_minus_a.x * a_direction.y) - (b_minus_a.y * a_direction.x)) / a_direction_cross_b_direction;
 
-    for (const CollisionTriangle& triangle : collision_triangles) {
-        // check that direction is not perpendicular to triangle normal
-        float d_dot_n = glm::dot(direction, triangle.normal);
-        if (d_dot_n == 0.0f) {
-            continue;
-        }
-
-        // check whether ray intersects with triangle plane
-        float nd = glm::dot(triangle.normal, triangle.a - point);
-        float t = (nd - glm::dot(point, triangle.normal)) / d_dot_n;
-        if (t < 0) {
-            continue;
-        }
-
-        float u = glm::dot(triangle.unit_u, point - triangle.a);
-        float v = glm::dot(triangle.unit_v, point - triangle.a);
-        if (u < 0 || u > triangle.w || v < 0 || v > triangle.w ||
-            (u <= triangle.g && v > u * (triangle.h / triangle.g)) ||
-            (u >= triangle.g && v > triangle.w - (u * (triangle.h / (triangle.w - triangle.g))))) {
-            continue;
-        }
-
-        return std::min(t, glm::length(velocity));
+    if (a_time < 0.0f || a_time > 1.0f || b_time < 0.0f || b_time > 1.0f) {
+        return -1.0f;
     }
-    return glm::length(velocity);
+
+    return a_time;
 }
+
+glm::vec3 Sector::get_collision_normal(const glm::vec3& point) const {
+    // first check if within bounding box
+    if (point.x < aabb_top_left.x || point.y > aabb_bot_right.x ||
+        point.y < floor_y || point.y > ceiling_y ||
+        point.z < aabb_top_left.y || point.z > aabb_bot_right.y) {
+        return glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+
+    // next check if within polygon
+    glm::vec2 raycast_start = aabb_top_left - glm::vec2(1.0f, 1.0f);
+    glm::vec2 point2d = glm::vec2(point.x, point.z);
+    glm::vec2 raycast_direction = point2d - raycast_start;
+
+    unsigned int hits = 0;
+    for (unsigned int wall = 0; wall < vertices.size(); wall++) {
+        float raycast_result = raycast(raycast_start, raycast_direction, vertices[wall], vertices[(wall + 1) % vertices.size()] - vertices[wall]);
+        if (raycast_result != -1.0f && raycast_result <= glm::length(raycast_direction)) {
+            hits++;
+        }
+    }
+
+    if (hits % 2 == 0) {
+        return glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+
+    glm::vec3 collision_normal = glm::vec3(0.0f, 0.0f, 0.0f);
+    float player_radius = 0.5f;
+    float player_radius_squared = player_radius * player_radius;
+
+    // check for floor/ceiling collisions
+    // assumes they won't collide into both on the same frame
+    if (std::fabs(point.y - floor_y) < player_radius) {
+        collision_normal += glm::vec3(0.0f, 1.0f, 0.0f);
+    } else if (std::fabs(point.y - ceiling_y) < player_radius) {
+        collision_normal += glm::vec3(0.0f, -1.0f, 0.0f);
+    }
+
+    for (unsigned int wall = 0; wall < vertices.size(); wall++) {
+        glm::vec2 wallv = vertices[(wall + 1) % vertices.size()] - vertices[wall];
+        glm::vec2 f = vertices[wall] - point2d;
+        float a = glm::dot(wallv, wallv);
+        float b = 2 * glm::dot(f, wallv);
+        float c = glm::dot(f, f) - player_radius_squared;
+        float discriminant = (b * b) - (4 * a * c);
+
+        if (discriminant < 0.0f) {
+            continue;
+        }
+
+        collision_normal += wall_normals[wall];
+    }
+
+    if (collision_normal.x != 0.0f || collision_normal.y != 0.0f || collision_normal.z != 0.0f) {
+        collision_normal = glm::normalize(collision_normal);
+    }
+
+    return collision_normal;
+}
+
 
 void Sector::render(unsigned int shader) {
     glBindVertexArray(vao);
@@ -259,13 +257,16 @@ bool Level::init() {
     return true;
 }
 
+
 void Level::update(float delta) {
     player.update(delta);
+    player.position += player.velocity * delta;
 
+    // check collisions
     if (glm::length(player.velocity) != 0.0f) {
-        float velocity_length = sector.collision_check(player.position, player.velocity * delta);
-        printf("v %f\n", velocity_length);
-        player.position += player.velocity * velocity_length;
+        glm::vec3 collision_normal = sector.get_collision_normal(player.position);
+        glm::vec3 velocity_in_wall_normal_direction = collision_normal * glm::dot(player.velocity * delta, collision_normal);
+        player.position -= velocity_in_wall_normal_direction;
     }
 }
 

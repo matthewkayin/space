@@ -7,7 +7,7 @@
 #include "input.hpp"
 
 Player::Player() {
-    position = glm::vec3(0.0f, 0.5f, 0.0f);
+    position = glm::vec3(0.0f, 1.0f, 0.0f);
     velocity = glm::vec3(0.0f, 0.0f, 0.0f);
     basis = glm::mat4(1.0f);
 }
@@ -38,22 +38,23 @@ void Player::update(float delta) {
     }
     printf("\n");*/
 
+    velocity = glm::vec3(0.0f, 0.0f, 0.0f);
     if (input.is_action_pressed[INPUT_FORWARD]) {
-        velocity -= glm::vec3(basis[2]) * 0.01f;
+        velocity -= glm::vec3(basis[2]) * 0.1f;
     }
     if (input.is_action_pressed[INPUT_BACKWARD]) {
-        velocity += glm::vec3(basis[2]) * 0.01f;
+        velocity += glm::vec3(basis[2]) * 0.1f;
     }
     if (input.is_action_pressed[INPUT_RIGHT]) {
-        velocity += glm::vec3(basis[0]) * 0.01f;
+        velocity += glm::vec3(basis[0]) * 0.1f;
     }
     if (input.is_action_pressed[INPUT_LEFT]) {
-        velocity -= glm::vec3(basis[0]) * 0.01f;
+        velocity -= glm::vec3(basis[0]) * 0.1f;
     }
     if (input.is_action_pressed[INPUT_UP]) {
-        velocity += glm::vec3(basis[1]) * 0.01f;
+        velocity += glm::vec3(basis[1]) * 0.1f;
     }
     if (input.is_action_pressed[INPUT_DOWN]) {
-        velocity -= glm::vec3(basis[1]) * 0.01f;
+        velocity -= glm::vec3(basis[1]) * 0.1f;
     }
 }
