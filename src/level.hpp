@@ -33,7 +33,6 @@ struct Sector {
     Sector();
     void add_vertex(const glm::vec2 vertex, bool add_wall);
     void init_buffers();
-    glm::vec3 get_collision_normal(const glm::vec3& position) const;
     void render(unsigned int shader);
 };
 

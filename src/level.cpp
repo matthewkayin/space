@@ -10,6 +10,20 @@
 
 const int TEXTURE_SIZE = 64;
 
+float raycast(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm::vec2 b_direction) {
+    glm::vec2 b_minus_a = b_origin - a_origin;
+    float a_direction_cross_b_direction = (a_direction.x * b_direction.y) - (a_direction.y * b_direction.x);
+
+    float a_time = ((b_minus_a.x * b_direction.y) - (b_minus_a.y * b_direction.x)) / a_direction_cross_b_direction;
+    float b_time = ((b_minus_a.x * a_direction.y) - (b_minus_a.y * a_direction.x)) / a_direction_cross_b_direction;
+
+    if (a_time < 0.0f || a_time > 1.0f || b_time < 0.0f || b_time > 1.0f) {
+        return -1.0f;
+    }
+
+    return a_time;
+}
+
 Sector::Sector() {
 
 }
@@ -146,76 +160,6 @@ void Sector::init_buffers() {
     vertex_data.clear();
 }
 
-float raycast(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm::vec2 b_direction) {
-    glm::vec2 b_minus_a = b_origin - a_origin;
-    float a_direction_cross_b_direction = (a_direction.x * b_direction.y) - (a_direction.y * b_direction.x);
-
-    float a_time = ((b_minus_a.x * b_direction.y) - (b_minus_a.y * b_direction.x)) / a_direction_cross_b_direction;
-    float b_time = ((b_minus_a.x * a_direction.y) - (b_minus_a.y * a_direction.x)) / a_direction_cross_b_direction;
-
-    if (a_time < 0.0f || a_time > 1.0f || b_time < 0.0f || b_time > 1.0f) {
-        return -1.0f;
-    }
-
-    return a_time;
-}
-
-glm::vec3 Sector::get_collision_normal(const glm::vec3& point) const {
-    // first check if within bounding box
-    if (point.x < aabb_top_left.x || point.y > aabb_bot_right.x ||
-        point.y < floor_y || point.y > ceiling_y ||
-        point.z < aabb_top_left.y || point.z > aabb_bot_right.y) {
-        return glm::vec3(0.0f, 0.0f, 0.0f);
-    }
-
-    // next check if within polygon
-    glm::vec2 raycast_start = aabb_top_left - glm::vec2(1.0f, 1.0f);
-    glm::vec2 point2d = glm::vec2(point.x, point.z);
-    glm::vec2 raycast_direction = point2d - raycast_start;
-
-    unsigned int hits = 0;
-    for (unsigned int wall = 0; wall < vertices.size(); wall++) {
-        float raycast_result = raycast(raycast_start, raycast_direction, vertices[wall], vertices[(wall + 1) % vertices.size()] - vertices[wall]);
-        if (raycast_result != -1.0f && raycast_result <= glm::length(raycast_direction)) {
-            hits++;
-        }
-    }
-
-    if (hits % 2 == 0) {
-        return glm::vec3(0.0f, 0.0f, 0.0f);
-    }
-
-    glm::vec3 collision_normal = glm::vec3(0.0f, 0.0f, 0.0f);
-    float player_radius = 0.5f;
-    float player_radius_squared = player_radius * player_radius;
-
-    // check for floor/ceiling collisions
-    // assumes they won't collide into both on the same frame
-    if (std::fabs(point.y - floor_y) < player_radius) {
-        collision_normal += glm::vec3(0.0f, 1.0f, 0.0f);
-    } else if (std::fabs(point.y - ceiling_y) < player_radius) {
-        collision_normal += glm::vec3(0.0f, -1.0f, 0.0f);
-    }
-
-    for (unsigned int wall = 0; wall < vertices.size(); wall++) {
-        glm::vec2 wallv = vertices[(wall + 1) % vertices.size()] - vertices[wall];
-        glm::vec2 f = vertices[wall] - point2d;
-        float a = glm::dot(wallv, wallv);
-        float b = 2 * glm::dot(f, wallv);
-        float c = glm::dot(f, f) - player_radius_squared;
-        float discriminant = (b * b) - (4 * a * c);
-
-        if (discriminant < 0.0f) {
-            continue;
-        }
-
-        collision_normal += walls[wall].normal;
-    }
-
-    return collision_normal;
-}
-
-
 void Sector::render(unsigned int shader) {
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, vertex_data_size);
@@ -283,21 +227,98 @@ bool Level::init() {
 
 void Level::update(float delta) {
     player.update(delta);
-    player.position += player.velocity * delta;
 
-    // check collisions
+    // check collisions and move player
     if (glm::length(player.velocity) != 0.0f) {
-        glm::vec3 collision_normal = glm::vec3(0.0f, 0.0f, 0.0f);
-        // for (unsigned int i = 0; i < sectors.size(); i++) {
-        collision_normal += sectors[0].get_collision_normal(player.position);
-        printf("%i %f %f %f\n", 0, collision_normal.x, collision_normal.y, collision_normal.z);
-        //}
+        glm::vec3 actual_velocity = player.velocity * delta;
 
-        if (collision_normal.x != 0.0f || collision_normal.y != 0.0f || collision_normal.z != 0.0f) {
-            collision_normal = glm::normalize(collision_normal);
-            glm::vec3 velocity_in_wall_normal_direction = collision_normal * glm::dot(player.velocity * delta, collision_normal);
-            player.position -= velocity_in_wall_normal_direction;
+        // check if within sector AABB
+        std::vector<Sector*> nearby_sectors;
+        for (unsigned int i = 0; i < sectors.size(); i++) {
+            Sector* sector = &sectors[i];
+            float padding = 1.0f;
+            if (player.position.x < sector->aabb_top_left.x - padding || player.position.x > sector->aabb_bot_right.x + padding ||
+                player.position.y < sector->floor_y || player.position.y > sector->ceiling_y ||
+                player.position.z < sector->aabb_top_left.y - padding || player.position.z > sector->aabb_bot_right.y + padding) {
+                continue;
+            }
+            nearby_sectors.push_back(sector);
         }
+
+        // check floor / ceiling collisions
+        glm::vec2 origin2d = glm::vec2(player.position.x, player.position.z);
+        for (Sector* sector : nearby_sectors) {
+            glm::vec2 raycast_start = sector->aabb_top_left - glm::vec2(1.0f, 1.0f);
+            glm::vec2 raycast_direction = origin2d - raycast_start;
+            unsigned int hits = 0;
+            for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
+                float raycast_result = raycast(raycast_start, raycast_direction, sector->vertices[wall], sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall]);
+                if (raycast_result != -1.0f) {
+                    hits++;
+                }
+            }
+
+            if (hits % 2 == 0) {
+                continue;
+            }
+
+            float predicted_y = player.position.y + actual_velocity.y;
+            if (predicted_y + 0.5f >= sector->ceiling_y) {
+                glm::vec3 velocity_in_ceiling_normal_direction = glm::vec3(0.0f, -1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, -1.0f, 0.0f));
+                actual_velocity -= velocity_in_ceiling_normal_direction;
+            } else if (predicted_y - 0.5f <= sector->floor_y) {
+                glm::vec3 velocity_in_floor_normal_direction = glm::vec3(0.0f, 1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, 1.0f, 0.0f));
+                actual_velocity -= velocity_in_floor_normal_direction;
+            }
+        }
+
+        // check wall collisions
+        bool collided = true;
+        unsigned int attempts = 0;
+        while (collided && attempts < 5) {
+            collided = false;
+            attempts++;
+
+            for (Sector* sector : nearby_sectors) {
+                for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
+                    if (!sector->walls[wall].exists) {
+                        continue;
+                    }
+
+                    glm::vec2 velocity2d = glm::vec2(actual_velocity.x, actual_velocity.z);
+                    glm::vec2 predicted_origin2d = origin2d + velocity2d;
+
+                    glm::vec2 wallv = sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall];
+                    glm::vec2 f = sector->vertices[wall] - predicted_origin2d;
+                    float a = glm::dot(wallv, wallv);
+                    float b = 2 * glm::dot(f, wallv);
+                    float c = glm::dot(f, f) - 0.25f;
+                    float discriminant = (b * b) - (4.0f * a * c);
+
+                    if (discriminant < 0.0f) {
+                        continue;
+                    }
+
+                    discriminant = sqrt(discriminant);
+                    float t1 = (-b - discriminant) / (2.0f * a);
+                    float t2 = (-b + discriminant) / (2.0f * a);
+
+                    if (!(t1 >= 0.0f && t1 <= 1.0f) && !(t2 >= 0.0f && t2 <= 1.0f)) {
+                        continue;
+                    }
+
+                    glm::vec3 velocity_in_wall_normal_direction = sector->walls[wall].normal * glm::dot(actual_velocity, sector->walls[wall].normal);
+                    actual_velocity = actual_velocity - velocity_in_wall_normal_direction;
+                    collided = true;
+                }
+            }
+        }
+
+        if (attempts == 5) {
+            actual_velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+        }
+
+        player.position += actual_velocity;
     }
 }
 
