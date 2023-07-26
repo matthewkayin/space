@@ -4,6 +4,7 @@
 
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <stb_image.h>
 
 #include <cstdio>
@@ -89,7 +90,7 @@ void Sector::init_buffers() {
         }
     }
 
-    // ceiling and floor
+    // determine AABB
     aabb_top_left = vertices[0];
     aabb_bot_right = vertices[0];
     for (unsigned int i = 1; i < vertices.size(); i++) {
@@ -98,6 +99,16 @@ void Sector::init_buffers() {
         aabb_bot_right.x = std::max(aabb_bot_right.x, vertices[i].x);
         aabb_bot_right.y = std::max(aabb_bot_right.y, vertices[i].y);
     }
+    aabb[0] = glm::vec4(aabb_top_left.x, ceiling_y, aabb_top_left.y, 1.0f);
+    aabb[1] = glm::vec4(aabb_bot_right.x, ceiling_y, aabb_top_left.y, 1.0f);
+    aabb[2] = glm::vec4(aabb_top_left.x, ceiling_y, aabb_bot_right.y, 1.0f);
+    aabb[3] = glm::vec4(aabb_bot_right.x, ceiling_y, aabb_bot_right.y, 1.0f);
+    aabb[4] = glm::vec4(aabb_top_left.x, floor_y, aabb_top_left.y, 1.0f);
+    aabb[5] = glm::vec4(aabb_bot_right.x, floor_y, aabb_top_left.y, 1.0f);
+    aabb[6] = glm::vec4(aabb_top_left.x, floor_y, aabb_bot_right.y, 1.0f);
+    aabb[7] = glm::vec4(aabb_bot_right.x, floor_y, aabb_bot_right.y, 1.0f);
+
+    // ceiling and floor
     glm::vec2 ceiling_scale = glm::vec2(std::fabs(aabb_bot_right.x - aabb_top_left.x), std::fabs(aabb_top_left.y - aabb_bot_right.y));
     for (unsigned int i = 2; i < vertices.size(); i++) {
         glm::vec3 triangle_vertices[3] = {
@@ -164,6 +175,32 @@ void Sector::render(unsigned int shader) {
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, vertex_data_size);
     glBindVertexArray(0);
+}
+
+Frustum::Frustum(const glm::mat4& projection_view_transpose) {
+    plane[0] = glm::vec4(projection_view_transpose[3] + projection_view_transpose[0]); // left
+    plane[1] = glm::vec4(projection_view_transpose[3] - projection_view_transpose[0]); // right
+    plane[2] = glm::vec4(projection_view_transpose[3] + projection_view_transpose[1]); // bottom
+    plane[3] = glm::vec4(projection_view_transpose[3] - projection_view_transpose[1]); // top
+    plane[4] = glm::vec4(projection_view_transpose[3] + projection_view_transpose[2]); // near
+    plane[5] = glm::vec4(projection_view_transpose[3] - projection_view_transpose[2]); // far
+}
+
+bool Frustum::is_inside(const Sector& sector) const {
+    for (unsigned int plane_index = 0; plane_index < 6; plane_index++) {
+        bool all_inside_plane_halfspace = true;
+        for (unsigned int aabb_index = 0; aabb_index < 8; aabb_index++) {
+            if (glm::dot(sector.aabb[aabb_index], plane[plane_index]) >= 0.0f) {
+                all_inside_plane_halfspace = false;
+                break;
+            }
+        }
+        if (all_inside_plane_halfspace) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool Level::init() {
@@ -323,8 +360,27 @@ void Level::update(float delta) {
 }
 
 void Level::render() {
-    // glUseProgram(texture_shader);
+    glUseProgram(texture_shader);
+
+    // view / projection transformations
+    glm::mat4 view;
+    view = glm::lookAt(player.position, player.position - glm::vec3(player.basis[2]), glm::vec3(player.basis[1]));
+    glm::mat4 projection;
+    projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+    glUniformMatrix4fv(glGetUniformLocation(texture_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniformMatrix4fv(glGetUniformLocation(texture_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
+
+    glm::vec3 light_pos = glm::vec3(1.0f, 1.5f, -2.0f);
+    glUniform3fv(glGetUniformLocation(texture_shader, "light_pos"), 1, glm::value_ptr(light_pos));
+    glUniform3fv(glGetUniformLocation(texture_shader, "view_pos"), 1, glm::value_ptr(player.position));
+
+    glm::mat4 projection_view_transpose = glm::transpose(projection * view);
+    Frustum frustum = Frustum(projection_view_transpose);
     for (unsigned int i = 0; i < sectors.size(); i++) {
+        if (!frustum.is_inside(sectors[i])) {
+            continue;
+        }
+
         sectors[i].render(texture_shader);
     }
 }

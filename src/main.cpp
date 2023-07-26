@@ -13,7 +13,6 @@
 #include <SDL2/SDL.h>
 #include <stb_image.h>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <cstdio>
@@ -79,130 +78,6 @@ int main() {
         return -1;
     }
 
-    float light_vertices[] = {
-        -0.5f, -0.5f, -0.5f,
-         0.5f, -0.5f, -0.5f,
-         0.5f,  0.5f, -0.5f,
-         0.5f,  0.5f, -0.5f,
-        -0.5f,  0.5f, -0.5f,
-        -0.5f, -0.5f, -0.5f,
-
-        -0.5f, -0.5f,  0.5f,
-         0.5f, -0.5f,  0.5f,
-         0.5f,  0.5f,  0.5f,
-         0.5f,  0.5f,  0.5f,
-        -0.5f,  0.5f,  0.5f,
-        -0.5f, -0.5f,  0.5f,
-
-        -0.5f,  0.5f,  0.5f,
-        -0.5f,  0.5f, -0.5f,
-        -0.5f, -0.5f, -0.5f,
-        -0.5f, -0.5f, -0.5f,
-        -0.5f, -0.5f,  0.5f,
-        -0.5f,  0.5f,  0.5f,
-
-         0.5f,  0.5f,  0.5f,
-         0.5f,  0.5f, -0.5f,
-         0.5f, -0.5f, -0.5f,
-         0.5f, -0.5f, -0.5f,
-         0.5f, -0.5f,  0.5f,
-         0.5f,  0.5f,  0.5f,
-
-        -0.5f, -0.5f, -0.5f,
-         0.5f, -0.5f, -0.5f,
-         0.5f, -0.5f,  0.5f,
-         0.5f, -0.5f,  0.5f,
-        -0.5f, -0.5f,  0.5f,
-        -0.5f, -0.5f, -0.5f,
-
-        -0.5f,  0.5f, -0.5f,
-         0.5f,  0.5f, -0.5f,
-         0.5f,  0.5f,  0.5f,
-         0.5f,  0.5f,  0.5f,
-        -0.5f,  0.5f,  0.5f,
-        -0.5f,  0.5f, -0.5f,
-    };
-
-    unsigned int light_vao, light_vbo;
-    glGenVertexArrays(1, &light_vao);
-    glGenBuffers(1, &light_vbo);
-
-    glBindVertexArray(light_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, light_vbo);
-
-    glBufferData(GL_ARRAY_BUFFER, sizeof(light_vertices), light_vertices, GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, (void*)0);
-
-    glBindVertexArray(0);
-
-    float cube_vertices[] = {
-        -7.0f, -3.0f, -10.0f,  0.0f,  0.0f, 1.0f,
-         3.0f, -3.0f, -10.0f,  0.0f,  0.0f, 1.0f,
-         3.0f,  3.0f, -10.0f,  0.0f,  0.0f, 1.0f,
-         3.0f,  3.0f, -10.0f,  0.0f,  0.0f, 1.0f,
-        -7.0f,  3.0f, -10.0f,  0.0f,  0.0f, 1.0f,
-        -7.0f, -3.0f, -10.0f,  0.0f,  0.0f, 1.0f,
-
-        -7.0f, -3.0f,  10.0f,  0.0f,  0.0f, -1.0f,
-         3.0f, -3.0f,  10.0f,  0.0f,  0.0f, -1.0f,
-         3.0f,  3.0f,  10.0f,  0.0f,  0.0f, -1.0f,
-         3.0f,  3.0f,  10.0f,  0.0f,  0.0f, -1.0f,
-        -7.0f,  3.0f,  10.0f,  0.0f,  0.0f, -1.0f,
-        -7.0f, -3.0f,  10.0f,  0.0f,  0.0f, -1.0f,
-
-        -7.0f,  3.0f,  10.0f, 1.0f,  0.0f,  0.0f,
-        -7.0f,  3.0f, -10.0f, 1.0f,  0.0f,  0.0f,
-        -7.0f, -3.0f, -10.0f, 1.0f,  0.0f,  0.0f,
-        -7.0f, -3.0f, -10.0f, 1.0f,  0.0f,  0.0f,
-        -7.0f, -3.0f,  10.0f, 1.0f,  0.0f,  0.0f,
-        -7.0f,  3.0f,  10.0f, 1.0f,  0.0f,  0.0f,
-
-         3.0f,  3.0f,  10.0f, -1.0f,  0.0f,  0.0f,
-         3.0f,  3.0f, -10.0f, -1.0f,  0.0f,  0.0f,
-         3.0f, -3.0f, -10.0f, -1.0f,  0.0f,  0.0f,
-         3.0f, -3.0f, -10.0f, -1.0f,  0.0f,  0.0f,
-         3.0f, -3.0f,  10.0f, -1.0f,  0.0f,  0.0f,
-         3.0f,  3.0f,  10.0f, -1.0f,  0.0f,  0.0f,
-
-        -7.0f, -3.0f, -10.0f,  0.0f, 1.0f,  0.0f,
-         3.0f, -3.0f, -10.0f,  0.0f, 1.0f,  0.0f,
-         3.0f, -3.0f,  10.0f,  0.0f, 1.0f,  0.0f,
-         3.0f, -3.0f,  10.0f,  0.0f, 1.0f,  0.0f,
-        -7.0f, -3.0f,  10.0f,  0.0f, 1.0f,  0.0f,
-        -7.0f, -3.0f, -10.0f,  0.0f, 1.0f,  0.0f,
-
-        -7.0f,  3.0f, -10.0f,  0.0f, -1.0f,  0.0f,
-         3.0f,  3.0f, -10.0f,  0.0f, -1.0f,  0.0f,
-         3.0f,  3.0f,  10.0f,  0.0f, -1.0f,  0.0f,
-         3.0f,  3.0f,  10.0f,  0.0f, -1.0f,  0.0f,
-        -7.0f,  3.0f,  10.0f,  0.0f, -1.0f,  0.0f,
-        -7.0f,  3.0f, -10.0f,  0.0f, -1.0f,  0.0f
-    };
-
-    unsigned int cube_vao, cube_vbo;
-    glGenVertexArrays(1, &cube_vao);
-    glGenBuffers(1, &cube_vbo);
-
-    glBindVertexArray(cube_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
-
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)0);
-
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 6, (void*)(3 * sizeof(float)));
-
-    glBindVertexArray(0);
-
-    glm::vec3 camera_position = glm::vec3(0.0f, 0.0f, 3.0f);
-    glm::vec3 camera_move_direction = glm::vec3(0.0f, 0.0f, 0.0f);
-    float pitch = 0.0f;
-    float yaw = -90.0f;
-
     input_set_mapping();
 
     Level level;
@@ -250,72 +125,14 @@ int main() {
 
         // Update
         level.update(delta);
-        glm::vec3 camera_direction = glm::normalize(
-                glm::vec3(
-                    cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
-                    sin(glm::radians(pitch)),
-                    sin(glm::radians(yaw)) * cos(glm::radians(pitch))));
-
-        camera_move_direction = glm::vec3(0.0f, 0.0f, 0.0f);
-        glm::vec3 forward_move_direction = glm::normalize(glm::vec3(camera_direction.x, 0.0f, camera_direction.z));
-        /*
-        if (keystate[SDL_SCANCODE_W]) {
-            camera_move_direction = forward_move_direction;
-        } else if (keystate[SDL_SCANCODE_S]) {
-            camera_move_direction = -forward_move_direction;
-        }
-        if (keystate[SDL_SCANCODE_A]) {
-            camera_move_direction = camera_move_direction - glm::normalize(glm::cross(forward_move_direction, glm::vec3(0.0f, 1.0f, 0.0f)));
-        } else if (keystate[SDL_SCANCODE_D]) {
-            camera_move_direction = camera_move_direction + glm::normalize(glm::cross(forward_move_direction, glm::vec3(0.0f, 1.0f, 0.0f)));
-        }
-        if (glm::length(camera_move_direction) > 1) {
-            camera_move_direction = glm::normalize(camera_move_direction);
-        }
-        camera_position = camera_position + (camera_move_direction * 0.1f);
-        if (keystate[SDL_SCANCODE_Q]) {
-            camera_position.y -= 0.1f;
-        } else if (keystate[SDL_SCANCODE_E]) {
-            camera_position.y += 0.1f;
-        }
-        */
 
         // Render
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glBlendFunc(GL_ONE, GL_ZERO);
-        glUseProgram(level.texture_shader);
 
-        glm::vec3 light_pos = glm::vec3(1.0f, 1.5f, -2.0f);
-        glUniform3fv(glGetUniformLocation(level.texture_shader, "light_pos"), 1, glm::value_ptr(light_pos));
-        glUniform3fv(glGetUniformLocation(level.texture_shader, "view_pos"), 1, glm::value_ptr(camera_position));
-
-        // view / projection transformations
-        glm::mat4 view;
-        view = glm::lookAt(level.player.position, level.player.position - glm::vec3(level.player.basis[2]), glm::vec3(level.player.basis[1]));
-        glm::mat4 projection;
-        projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-        glUniformMatrix4fv(glGetUniformLocation(level.texture_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(level.texture_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
-
-        glm::mat4 model = glm::mat4(1.0f);
-        glUniformMatrix4fv(glGetUniformLocation(level.texture_shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        /*glBindVertexArray(cube_vao);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);*/
         level.render();
-
-        glm::mat4 light_model = glm::mat4(1.0f);
-        light_model = glm::translate(light_model, light_pos);
-        light_model = glm::scale(light_model, glm::vec3(0.2f));
-        glUseProgram(light_shader);
-        glUniformMatrix4fv(glGetUniformLocation(light_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-        glUniformMatrix4fv(glGetUniformLocation(light_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(glGetUniformLocation(light_shader, "model"), 1, GL_FALSE, glm::value_ptr(light_model));
-        glBindVertexArray(light_vao);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
 
         // Render text
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

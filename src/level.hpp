@@ -25,6 +25,7 @@ struct Sector {
     std::vector<Wall> walls;
     glm::vec2 aabb_top_left;
     glm::vec2 aabb_bot_right;
+    glm::vec4 aabb[8];
 
     std::vector<VertexData> vertex_data;
     unsigned int vertex_data_size;
@@ -34,6 +35,12 @@ struct Sector {
     void add_vertex(const glm::vec2 vertex, bool add_wall);
     void init_buffers();
     void render(unsigned int shader);
+};
+
+struct Frustum {
+    glm::vec4 plane[6];
+    Frustum(const glm::mat4& projection_view_transpose);
+    bool is_inside(const Sector& sector) const;
 };
 
 struct Level {
