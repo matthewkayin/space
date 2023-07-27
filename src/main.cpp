@@ -90,6 +90,10 @@ int main() {
     while (running) {
         // Timekeep
         unsigned long current_time = SDL_GetTicks();
+        if (current_time - last_time < FRAME_TIME) {
+            continue;
+        }
+
         float delta = (float)(current_time - last_time) / 60.0f;
         last_time = current_time;
 
@@ -97,11 +101,6 @@ int main() {
             fps = frames;
             frames = 0;
             last_second += 1000;
-        }
-
-        if (current_time - last_time < FRAME_TIME) {
-            unsigned long delay_time = FRAME_TIME - (current_time - last_time);
-            SDL_Delay(delay_time);
         }
 
         // Handle input
