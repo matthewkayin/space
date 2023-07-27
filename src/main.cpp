@@ -41,7 +41,7 @@ int main() {
 
     SDL_GL_LoadLibrary(NULL);
 
-    window = SDL_CreateWindow("learngl", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
+    window = SDL_CreateWindow("zerog", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
     if (window == NULL) {
         printf("Error creating window: %s\n", SDL_GetError());
         return -1;

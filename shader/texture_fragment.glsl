@@ -37,7 +37,7 @@ vec3 calculate_spot_light(SpotLight light, vec3 normal, vec3 frag_pos, vec3 view
 
 void main() {
     vec3 view_direction = normalize(view_pos - frag_pos);
-    vec3 light_result = vec3(1.0, 1.0, 1.0) * 0.1;
+    vec3 light_result = vec3(1.0, 1.0, 1.0) * 0.025;
     light_result += calculate_spot_light(player_flashlight, normal, frag_pos, view_direction);
     for(uint i = 0; i < point_light_count; i++) {
         light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);

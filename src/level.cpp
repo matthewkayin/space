@@ -284,14 +284,13 @@ bool Level::init() {
     }
 
     glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.constant"), 1.0f);
-    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.linear"), 0.022f);
-    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.quadratic"), 0.0019f);
+    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.linear"), 0.09);
+    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.quadratic"), 0.032f);
     glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.cutoff"), glm::cos(glm::radians(12.5f)));
     glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.outer_cutoff"), glm::cos(glm::radians(17.5f)));
 
     return true;
 }
-
 
 void Level::update(float delta) {
     player.update(delta);
@@ -333,9 +332,11 @@ void Level::update(float delta) {
             float predicted_y = player.position.y + actual_velocity.y;
             if (predicted_y + 0.5f >= sector->ceiling_y) {
                 glm::vec3 velocity_in_ceiling_normal_direction = glm::vec3(0.0f, -1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, -1.0f, 0.0f));
+                player.velocity -= velocity_in_ceiling_normal_direction;
                 actual_velocity -= velocity_in_ceiling_normal_direction;
             } else if (predicted_y - 0.5f <= sector->floor_y) {
                 glm::vec3 velocity_in_floor_normal_direction = glm::vec3(0.0f, 1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, 1.0f, 0.0f));
+                player.velocity -= velocity_in_floor_normal_direction;
                 actual_velocity -= velocity_in_floor_normal_direction;
             }
         }
@@ -343,7 +344,7 @@ void Level::update(float delta) {
         // check wall collisions
         bool collided = true;
         unsigned int attempts = 0;
-        while (collided && attempts < 5) {
+        while (collided && attempts < 10) {
             collided = false;
             attempts++;
 
@@ -376,6 +377,7 @@ void Level::update(float delta) {
                     }
 
                     glm::vec3 velocity_in_wall_normal_direction = sector->walls[wall].normal * glm::dot(actual_velocity, sector->walls[wall].normal);
+                    player.velocity -= velocity_in_wall_normal_direction;
                     actual_velocity = actual_velocity - velocity_in_wall_normal_direction;
                     collided = true;
                 }
@@ -402,8 +404,7 @@ void Level::render() {
     glUniformMatrix4fv(glGetUniformLocation(texture_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniform3fv(glGetUniformLocation(texture_shader, "view_pos"), 1, glm::value_ptr(player.position));
     glUniform3fv(glGetUniformLocation(texture_shader, "player_flashlight.position"), 1, glm::value_ptr(player.position));
-    glm::vec3 player_forward = -glm::vec3(player.basis[2]);
-    glUniform3fv(glGetUniformLocation(texture_shader, "player_flashlight.direction"), 1, glm::value_ptr(player_forward));
+    glUniform3fv(glGetUniformLocation(texture_shader, "player_flashlight.direction"), 1, glm::value_ptr(player.flashlight_direction));
 
     glm::mat4 projection_view_transpose = glm::transpose(projection * view);
     Frustum frustum = Frustum(projection_view_transpose);
