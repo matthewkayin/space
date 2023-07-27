@@ -17,6 +17,14 @@ struct Wall {
     glm::vec3 normal;
 };
 
+struct PointLight {
+    glm::vec3 position;
+
+    float constant;
+    float linear;
+    float quadratic;
+};
+
 struct Sector {
     std::vector<glm::vec2> vertices;
     float floor_y;
@@ -48,6 +56,7 @@ struct Level {
     unsigned int texture_array;
 
     std::vector<Sector> sectors;
+    std::vector<PointLight> lights;
     Player player;
 
     bool init();

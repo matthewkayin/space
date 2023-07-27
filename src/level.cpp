@@ -223,6 +223,7 @@ bool Level::init() {
     if (!success) {
         return false;
     }
+
     glUseProgram(texture_shader);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture_array);
@@ -235,6 +236,7 @@ bool Level::init() {
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_LINEAR);
 
+    // create sectors
     Sector a;
     a.add_vertex(glm::vec2(-3.0f, -1.0f), true);
     a.add_vertex(glm::vec2(0.0f, -5.0f), false);
@@ -257,6 +259,35 @@ bool Level::init() {
     for (unsigned int i = 0; i < sectors.size(); i++) {
         sectors[i].init_buffers();
     }
+
+    // create lights
+    PointLight light = {
+        .position = glm::vec3(-2.8, 1.5f, 4.8f),
+        .constant = 1.0f,
+        .linear = 0.022f,
+        .quadratic = 0.0019f
+    };
+    PointLight light2 = {
+        .position = glm::vec3(1.0f, 1.5f, -2.0f),
+        .constant = 1.0f,
+        .linear = 0.022f,
+        .quadratic = 0.0019f
+    };
+
+    glUniform1ui(glGetUniformLocation(texture_shader, "point_light_count"), lights.size());
+    for (unsigned int i = 0; i < lights.size(); i++) {
+        std::string shader_var_name = "point_lights[" + std::to_string(i) + "]";
+        glUniform3fv(glGetUniformLocation(texture_shader, (shader_var_name + ".position").c_str()), 1, glm::value_ptr(lights[i].position));
+        glUniform1f(glGetUniformLocation(texture_shader, (shader_var_name + ".constant").c_str()), lights[i].constant);
+        glUniform1f(glGetUniformLocation(texture_shader, (shader_var_name + ".linear").c_str()), lights[i].linear);
+        glUniform1f(glGetUniformLocation(texture_shader, (shader_var_name + ".quadratic").c_str()), lights[i].quadratic);
+    }
+
+    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.constant"), 1.0f);
+    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.linear"), 0.022f);
+    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.quadratic"), 0.0019f);
+    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.cutoff"), glm::cos(glm::radians(12.5f)));
+    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.outer_cutoff"), glm::cos(glm::radians(17.5f)));
 
     return true;
 }
@@ -369,10 +400,10 @@ void Level::render() {
     projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
     glUniformMatrix4fv(glGetUniformLocation(texture_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUniformMatrix4fv(glGetUniformLocation(texture_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
-
-    glm::vec3 light_pos = glm::vec3(1.0f, 1.5f, -2.0f);
-    glUniform3fv(glGetUniformLocation(texture_shader, "light_pos"), 1, glm::value_ptr(light_pos));
     glUniform3fv(glGetUniformLocation(texture_shader, "view_pos"), 1, glm::value_ptr(player.position));
+    glUniform3fv(glGetUniformLocation(texture_shader, "player_flashlight.position"), 1, glm::value_ptr(player.position));
+    glm::vec3 player_forward = -glm::vec3(player.basis[2]);
+    glUniform3fv(glGetUniformLocation(texture_shader, "player_flashlight.direction"), 1, glm::value_ptr(player_forward));
 
     glm::mat4 projection_view_transpose = glm::transpose(projection * view);
     Frustum frustum = Frustum(projection_view_transpose);
