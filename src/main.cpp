@@ -2,6 +2,7 @@
     #define SDL_MAIN_HANDLED
 #endif
 
+#include "edit.hpp"
 #include "input.hpp"
 #include "level.hpp"
 #include "globals.hpp"
@@ -28,7 +29,7 @@ unsigned long last_second = SDL_GetTicks();
 unsigned int frames = 0;
 unsigned int fps = 0;
 
-int main() {
+int main(int argc, char** argv) {
     // Init engine
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("Error initializing SDL: %s\n", SDL_GetError());
@@ -81,8 +82,16 @@ int main() {
     input_set_mapping();
 
     Level level;
-    if(!level.init()) {
-        return -1;
+    Edit edit;
+    bool edit_mode = argc > 1 && std::string(argv[1]) == "--edit";
+    if (edit_mode) {
+        if (!edit.init()) {
+            return -1;
+        }
+    } else {
+        if(!level.init()) {
+            return -1;
+        }
     }
 
     // Game loop
@@ -123,7 +132,9 @@ int main() {
         }
 
         // Update
-        level.update(delta);
+        if (!edit_mode) {
+            level.update(delta);
+        }
 
         // Render
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
@@ -131,7 +142,11 @@ int main() {
 
         glBlendFunc(GL_ONE, GL_ZERO);
 
-        level.render();
+        if (edit_mode) {
+            edit.render();
+        } else {
+            level.render();
+        }
 
         // Render text
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

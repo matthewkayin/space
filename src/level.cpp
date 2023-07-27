@@ -9,8 +9,6 @@
 
 #include <cstdio>
 
-const int TEXTURE_SIZE = 64;
-
 float raycast(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm::vec2 b_direction) {
     glm::vec2 b_minus_a = b_origin - a_origin;
     float a_direction_cross_b_direction = (a_direction.x * b_direction.y) - (a_direction.y * b_direction.x);
