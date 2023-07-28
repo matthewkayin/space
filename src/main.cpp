@@ -20,6 +20,8 @@
 #include <map>
 #include <string>
 
+bool edit_mode;
+
 SDL_Window* window;
 SDL_GLContext context;
 
@@ -30,6 +32,8 @@ unsigned int frames = 0;
 unsigned int fps = 0;
 
 int main(int argc, char** argv) {
+    edit_mode = argc > 1 && std::string(argv[1]) == "--edit";
+
     // Init engine
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("Error initializing SDL: %s\n", SDL_GetError());
@@ -42,7 +46,15 @@ int main(int argc, char** argv) {
 
     SDL_GL_LoadLibrary(NULL);
 
-    window = SDL_CreateWindow("zerog", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
+    glm::ivec2 window_position = glm::ivec2(SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED);
+    if (edit_mode) {
+        SDL_Rect display_bounds;
+        SDL_GetDisplayBounds(0, &display_bounds);
+        window_position.x = (display_bounds.w / 2) + (SCREEN_WIDTH / 4);
+        window_position.y = (display_bounds.h / 2) - (SCREEN_HEIGHT / 2);
+    }
+
+    window = SDL_CreateWindow("zerog", window_position.x, window_position.y, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_OPENGL);
     if (window == NULL) {
         printf("Error creating window: %s\n", SDL_GetError());
         return -1;
@@ -81,17 +93,14 @@ int main(int argc, char** argv) {
 
     input_set_mapping();
 
-    Level level;
-    Edit edit;
-    bool edit_mode = argc > 1 && std::string(argv[1]) == "--edit";
-    if (edit_mode) {
-        if (!edit.init()) {
-            return -1;
-        }
-    } else {
-        if(!level.init()) {
-            return -1;
-        }
+    // setup edit mode
+    unsigned int main_window_id = SDL_GetWindowID(window);
+    if (edit_mode && !edit_init()) {
+        return false;
+    }
+
+    if (!level_init()) {
+        return false;
     }
 
     // Game loop
@@ -116,7 +125,7 @@ int main(int argc, char** argv) {
         input_prime_state();
         SDL_Event e;
         while (SDL_PollEvent(&e) != 0) {
-            if (e.type == SDL_QUIT) {
+            if (e.type == SDL_QUIT || (edit_mode && e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_CLOSE)) {
                 running = false;
             } else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
                 if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
@@ -125,7 +134,9 @@ int main(int argc, char** argv) {
                     running = false;
                 }
             } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == 1 && SDL_GetRelativeMouseMode() == SDL_FALSE) {
-                SDL_SetRelativeMouseMode(SDL_TRUE);
+                if (!edit_mode || e.button.windowID == main_window_id) {
+                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                }
             } else if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
                 input_handle_event(e);
             }
@@ -133,7 +144,13 @@ int main(int argc, char** argv) {
 
         // Update
         if (!edit_mode) {
-            level.update(delta);
+            level_update(delta);
+        } else {
+            if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
+                level_edit_update(delta);
+            } else {
+                // editor update
+            }
         }
 
         // Render
@@ -142,21 +159,24 @@ int main(int argc, char** argv) {
 
         glBlendFunc(GL_ONE, GL_ZERO);
 
-        if (edit_mode) {
-            edit.render();
-        } else {
-            level.render();
-        }
+            // edit.render();
+        level_render();
 
         // Render text
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         font_hack_10pt.render_text("FPS: " + std::to_string(fps), 0.0f, 0.0f, glm::vec3(1.0f, 1.0f, 1.0f));
+
+        // Render edit window
+        edit_render();
 
         SDL_GL_SwapWindow(window);
         frames++;
     }
 
     // Quit everything
+    if (edit_mode) {
+        edit_quit();
+    }
     SDL_DestroyWindow(window);
 
     SDL_Quit();

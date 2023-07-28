@@ -1,6 +1,8 @@
 #include "level.hpp"
 
 #include "shader.hpp"
+#include "input.hpp"
+#include "globals.hpp"
 
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -8,6 +10,18 @@
 #include <stb_image.h>
 
 #include <cstdio>
+
+unsigned int texture_shader;
+unsigned int texture_array;
+
+std::vector<Sector> sectors;
+std::vector<PointLight> lights;
+Player player;
+
+float camera_yaw = -90.0f;
+float camera_pitch = 0.0f;
+glm::vec3 camera_direction = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 camera_position = glm::vec3(0.0f, 0.5f, 0.0f);
 
 float raycast(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm::vec2 b_direction) {
     glm::vec2 b_minus_a = b_origin - a_origin;
@@ -21,10 +35,6 @@ float raycast(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm
     }
 
     return a_time;
-}
-
-Sector::Sector() {
-
 }
 
 void Sector::add_vertex(const glm::vec2 vertex, bool add_wall) {
@@ -169,7 +179,7 @@ void Sector::init_buffers() {
     vertex_data.clear();
 }
 
-void Sector::render(unsigned int shader) {
+void Sector::render() {
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, vertex_data_size);
     glBindVertexArray(0);
@@ -201,7 +211,7 @@ bool Frustum::is_inside(const Sector& sector) const {
     return true;
 }
 
-bool Level::init() {
+bool level_init() {
     // load texture array
     glGenTextures(1, &texture_array);
     glActiveTexture(GL_TEXTURE0);
@@ -272,6 +282,8 @@ bool Level::init() {
         .quadratic = 0.0019f
     };
 
+    glUniform1i(glGetUniformLocation(texture_shader, "lighting_enabled"), !edit_mode);
+
     glUniform1ui(glGetUniformLocation(texture_shader, "point_light_count"), lights.size());
     for (unsigned int i = 0; i < lights.size(); i++) {
         std::string shader_var_name = "point_lights[" + std::to_string(i) + "]";
@@ -290,7 +302,7 @@ bool Level::init() {
     return true;
 }
 
-void Level::update(float delta) {
+void level_update(float delta) {
     player.update(delta);
 
     // check collisions and move player
@@ -390,12 +402,52 @@ void Level::update(float delta) {
     }
 }
 
-void Level::render() {
+void level_edit_update(float delta) {
+    camera_yaw += input.mouse_raw_xrel * 0.1f;
+    camera_pitch -= input.mouse_raw_yrel * 0.1f;
+    camera_pitch = std::min(std::max(camera_pitch, -89.0f), 89.0f);
+    camera_direction = glm::normalize(glm::vec3(
+                    cos(glm::radians(camera_yaw)) * cos(glm::radians(camera_pitch)),
+                    sin(glm::radians(camera_pitch)),
+                    sin(glm::radians(camera_yaw)) * cos(glm::radians(camera_pitch))));
+
+    glm::vec3 camera_velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+    float camera_speed = 0.2f;
+    if (input.is_action_pressed[INPUT_FORWARD]) {
+        camera_velocity += camera_direction;
+    }
+    if (input.is_action_pressed[INPUT_BACKWARD]) {
+        camera_velocity += -camera_direction;
+    }
+    if (input.is_action_pressed[INPUT_UP]) {
+        camera_velocity += glm::vec3(0.0f, 1.0f, 0.0f);
+    }
+    if (input.is_action_pressed[INPUT_DOWN]) {
+        camera_velocity += glm::vec3(0.0f, -1.0f, 1.0f);
+    }
+    if (input.is_action_pressed[INPUT_LEFT]) {
+        camera_velocity += -glm::normalize(glm::cross(camera_direction, glm::vec3(0.0f, 1.0f, 0.0f)));
+    }
+    if (input.is_action_pressed[INPUT_RIGHT]) {
+        camera_velocity += glm::normalize(glm::cross(camera_direction, glm::vec3(0.0f, 1.0f, 0.0f)));
+    }
+    if (glm::length(camera_velocity) > 1.0f) {
+        camera_velocity = glm::normalize(camera_velocity);
+    }
+
+    camera_position += camera_velocity * camera_speed * delta;
+}
+
+void level_render() {
     glUseProgram(texture_shader);
 
     // view / projection transformations
     glm::mat4 view;
-    view = glm::lookAt(player.position, player.position - glm::vec3(player.basis[2]), glm::vec3(player.basis[1]));
+    if (!edit_mode) {
+        view = glm::lookAt(player.position, player.position - glm::vec3(player.basis[2]), glm::vec3(player.basis[1]));
+    } else {
+        view = glm::lookAt(camera_position, camera_position + camera_direction, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
     glm::mat4 projection;
     projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
     glUniformMatrix4fv(glGetUniformLocation(texture_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
@@ -411,6 +463,6 @@ void Level::render() {
             continue;
         }
 
-        sectors[i].render(texture_shader);
+        sectors[i].render();
     }
 }

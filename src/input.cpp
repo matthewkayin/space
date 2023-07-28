@@ -28,6 +28,8 @@ void input_prime_state() {
     for (unsigned int i = 0; i < INPUT_COUNT; i++) {
         input.is_action_just_pressed[i] = false;
     }
+    input.mouse_raw_xrel = 0.0f;
+    input.mouse_raw_yrel = 0.0f;
     input.mouse_x = 0.0f;
     input.mouse_y = 0.0f;
 }
@@ -49,6 +51,8 @@ void input_handle_event(SDL_Event e) {
 
         input.is_action_pressed[mapping->second] = false;
     } else if (e.type == SDL_MOUSEMOTION) {
+        input.mouse_raw_xrel = e.motion.xrel;
+        input.mouse_raw_yrel = e.motion.yrel;
         if (abs(e.motion.xrel) > MOUSE_DEADZONE) {
             input.mouse_x = std::max(std::min((float)e.motion.xrel / MOUSE_MAX, 1.0f), -1.0f);
         }

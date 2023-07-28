@@ -20,6 +20,8 @@ enum Input {
 struct InputState {
     bool is_action_pressed[INPUT_COUNT];
     bool is_action_just_pressed[INPUT_COUNT];
+    float mouse_raw_xrel;
+    float mouse_raw_yrel;
     float mouse_x;
     float mouse_y;
 };

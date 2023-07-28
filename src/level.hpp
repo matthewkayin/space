@@ -39,10 +39,10 @@ struct Sector {
     unsigned int vertex_data_size;
     unsigned int vao, vbo;
 
-    Sector();
+    Sector() {}
     void add_vertex(const glm::vec2 vertex, bool add_wall);
     void init_buffers();
-    void render(unsigned int shader);
+    void render();
 };
 
 struct Frustum {
@@ -51,15 +51,11 @@ struct Frustum {
     bool is_inside(const Sector& sector) const;
 };
 
-struct Level {
-    unsigned int texture_shader;
-    unsigned int texture_array;
+extern std::vector<Sector> sectors;
+extern std::vector<PointLight> lights;
+extern Player player;
 
-    std::vector<Sector> sectors;
-    std::vector<PointLight> lights;
-    Player player;
-
-    bool init();
-    void update(float delta);
-    void render();
-};
+bool level_init();
+void level_update(float delta);
+void level_edit_update(float delta);
+void level_render();

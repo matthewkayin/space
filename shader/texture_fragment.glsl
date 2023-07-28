@@ -26,6 +26,7 @@ in vec2 texture_coordinate;
 in vec3 frag_pos;
 in vec3 normal;
 
+uniform bool lighting_enabled;
 uniform vec3 view_pos;
 uniform PointLight point_lights[4];
 uniform uint point_light_count;
@@ -37,10 +38,15 @@ vec3 calculate_spot_light(SpotLight light, vec3 normal, vec3 frag_pos, vec3 view
 
 void main() {
     vec3 view_direction = normalize(view_pos - frag_pos);
-    vec3 light_result = vec3(1.0, 1.0, 1.0) * 0.025;
-    light_result += calculate_spot_light(player_flashlight, normal, frag_pos, view_direction);
-    for(uint i = 0; i < point_light_count; i++) {
-        light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);
+    vec3 light_result;
+    if (lighting_enabled) {
+        light_result = vec3(1.0, 1.0, 1.0) * 0.025;
+        light_result += calculate_spot_light(player_flashlight, normal, frag_pos, view_direction);
+        for(uint i = 0; i < point_light_count; i++) {
+            light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);
+        }
+    } else {
+        light_result = vec3(1.0, 1.0, 1.0);
     }
 
     FragColor = vec4(light_result, 1.0) * vec4(texture(texture_array, vec3(texture_coordinate.x, texture_coordinate.y, texture_index)));
