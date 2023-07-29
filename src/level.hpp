@@ -35,11 +35,13 @@ struct Sector {
     glm::vec2 aabb_bot_right;
     glm::vec4 aabb[8];
 
-    std::vector<VertexData> vertex_data;
-    unsigned int vertex_data_size;
+    bool has_generated_buffers;
     unsigned int vao, vbo;
+    unsigned int vertex_data_size;
 
-    Sector() {}
+    Sector() {
+        has_generated_buffers = false;
+    }
     void add_vertex(const glm::vec2 vertex, bool add_wall);
     void init_buffers();
     void render();
@@ -56,6 +58,7 @@ extern std::vector<PointLight> lights;
 extern Player player;
 
 bool level_init();
+void level_init_sectors();
 void level_update(float delta);
 void level_edit_update(float delta);
 void level_render();

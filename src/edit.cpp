@@ -48,7 +48,29 @@ std::vector<unsigned int> selected_sectors;
 std::vector<unsigned int> selected_vertices;
 bool dragging = false;
 glm::ivec2 drag_origin;
+bool changing_floor_or_ceiling = false;
+unsigned int text_y_offset;
+std::vector<SDL_Rect> ui_hover_box;
+int ui_hover_index = -1;
 
+bool is_mouse_in_rect(SDL_Rect& r) {
+    return !(input.mouse_raw_x < r.x || input.mouse_raw_x > r.x + r.w || input.mouse_raw_y < r.y || input.mouse_raw_y > r.y + r.h);
+}
+
+void refresh_ui_boxes() {
+    ui_hover_box.clear();
+    for (unsigned int i = 0; i < selected_sectors.size(); i++) {
+        int lines_of_text = 3;
+        ui_hover_box.push_back({
+            .x = ui_rect.x + 2,
+            .y = ui_rect.y + 19 + ((int)i * 12 * lines_of_text),
+            .w = ui_rect.w - 4,
+            .h = 12 * lines_of_text
+        });
+    }
+}
+
+void edit_render_ui_text(std::string text);
 void edit_render_text(std::string text, int x, int y);
 
 bool edit_init() {
@@ -89,55 +111,103 @@ void edit_quit() {
 }
 
 void edit_update() {
-    glm::ivec2 mouse_snapped_position = glm::ivec2(input.mouse_raw_x / 4, input.mouse_raw_y / 4) + camera_offset;
-    if (input.is_action_pressed[INPUT_CTRL]) {
-        mouse_snapped_position = (mouse_snapped_position / 8) * 8;
-    }
+    ui_hover_index = -1;
 
-    if (input.is_action_pressed[INPUT_RCLICK]) {
-        camera_offset += glm::ivec2((int)(input.mouse_raw_xrel / 4.0f), (int)(input.mouse_raw_yrel / 4.0f));
-    }
+    if (input.mouse_raw_x < ui_rect.x) {
+        // get mouse coordinate position
+        glm::ivec2 mouse_snapped_position = glm::ivec2(input.mouse_raw_x / 4, input.mouse_raw_y / 4) + camera_offset;
+        if (input.is_action_pressed[INPUT_CTRL]) {
+            mouse_snapped_position = (mouse_snapped_position / 8) * 8;
+        }
 
-    if (input.is_action_just_released[INPUT_LCLICK] && dragging) {
-        dragging = false;
-        drag_origin = mouse_snapped_position;
-    } else if (input.is_action_just_released[INPUT_LCLICK] && !dragging) {
-        selected_sectors.clear();
-        for (unsigned int i = 0; i < sectors.size(); i++) {
-            for (unsigned int j = 0; j < sectors[i].vertices.size(); j++) {
-                SDL_Rect vertex_screen_rect = {
-                    .x = (4 * ((int)(sectors[i].vertices[j].x * 8.0f) + camera_offset.x) - 2),
-                    .y = (4 * ((int)(sectors[i].vertices[j].y * 8.0f) + camera_offset.y) - 2),
-                    .w = 8,
-                    .h = 8
-                };
+        // camera panning
+        if (input.is_action_pressed[INPUT_RCLICK]) {
+            camera_offset += glm::ivec2((int)(input.mouse_raw_xrel / 4.0f), (int)(input.mouse_raw_yrel / 4.0f));
+        }
 
-                if (!(input.mouse_raw_x < vertex_screen_rect.x || input.mouse_raw_x > vertex_screen_rect.x + vertex_screen_rect.w ||
-                      input.mouse_raw_y < vertex_screen_rect.y || input.mouse_raw_y > vertex_screen_rect.y + vertex_screen_rect.h)) {
-                    selected_sectors.push_back(i);
-                    break;
+        // stop dragging object
+        if (input.is_action_just_released[INPUT_LCLICK] && dragging) {
+            dragging = false;
+            drag_origin = mouse_snapped_position;
+            level_init_sectors();
+        // select object
+        } else if (input.is_action_just_released[INPUT_LCLICK] && !dragging) {
+            if (!input.is_action_pressed[INPUT_CTRL]) {
+                selected_sectors.clear();
+            }
+            for (unsigned int i = 0; i < sectors.size(); i++) {
+                for (unsigned int j = 0; j < sectors[i].vertices.size(); j++) {
+                    SDL_Rect vertex_screen_rect = {
+                        .x = (4 * ((int)(sectors[i].vertices[j].x * 8.0f) + camera_offset.x) - 2),
+                        .y = (4 * ((int)(sectors[i].vertices[j].y * 8.0f) + camera_offset.y) - 2),
+                        .w = 8,
+                        .h = 8
+                    };
+
+                    if (is_mouse_in_rect(vertex_screen_rect)) {
+                        selected_sectors.push_back(i);
+                        break;
+                    }
+                }
+            }
+
+            refresh_ui_boxes();
+        }
+
+        // begin dragging object
+        if (input.is_action_just_pressed[INPUT_LCLICK]) {
+            drag_origin = mouse_snapped_position;
+        }
+        // handle dragging object
+        if (input.is_action_pressed[INPUT_LCLICK] && (mouse_snapped_position.x != drag_origin.x || mouse_snapped_position.y != drag_origin.y)) {
+            dragging = true;
+
+            glm::vec2 drag_movement = glm::vec2(mouse_snapped_position - drag_origin) / 8.0f;
+            drag_origin = mouse_snapped_position;
+
+            if (mode == MODE_SECTOR) {
+                for (unsigned int sector_index : selected_sectors) {
+                    for (unsigned int j = 0; j < sectors[sector_index].vertices.size(); j++) {
+                        sectors[sector_index].vertices[j] += drag_movement;
+                    }
                 }
             }
         }
-    }
-
-    if (input.is_action_just_pressed[INPUT_LCLICK]) {
-        drag_origin = mouse_snapped_position;
-    }
-    if (input.is_action_pressed[INPUT_LCLICK] && (mouse_snapped_position.x != drag_origin.x || mouse_snapped_position.y != drag_origin.y)) {
-        dragging = true;
-
-        glm::vec2 drag_movement = glm::vec2(mouse_snapped_position - drag_origin) / 8.0f;
-        drag_origin = mouse_snapped_position;
-
-        if (mode == MODE_SECTOR) {
-            for (unsigned int sector_index : selected_sectors) {
-                for (unsigned int j = 0; j < sectors[sector_index].vertices.size(); j++) {
-                    sectors[sector_index].vertices[j] += drag_movement;
-                    printf("%f ", glm::length(sectors[sector_index].vertices[(j + 1) % sectors[sector_index].vertices.size()] - sectors[sector_index].vertices[j]));
-                }
+    // mouse is inside ui rect
+    } else {
+        for (unsigned int i = 0; i < ui_hover_box.size(); i++) {
+            if (is_mouse_in_rect(ui_hover_box[i])) {
+                ui_hover_index = i;
+                break;
             }
-            printf("\n");
+        }
+
+        if (input.is_action_just_pressed[INPUT_LCLICK] && ui_hover_index != -1) {
+            if (mode == MODE_SECTOR) {
+                selected_sectors.erase(selected_sectors.begin() + ui_hover_index);
+                refresh_ui_boxes();
+            }
+        }
+
+        if (input.is_action_pressed[INPUT_UP] && ui_hover_index != -1 && input.mouse_raw_yrel != 0) {
+            sectors[selected_sectors[ui_hover_index]].ceiling_y -= input.mouse_raw_yrel;
+            if (sectors[selected_sectors[ui_hover_index]].ceiling_y <= sectors[selected_sectors[ui_hover_index]].floor_y) {
+                sectors[selected_sectors[ui_hover_index]].ceiling_y = sectors[selected_sectors[ui_hover_index]].floor_y + 1;
+            }
+            changing_floor_or_ceiling = true;
+        }
+
+        if (input.is_action_pressed[INPUT_DOWN] && ui_hover_index != -1 && input.mouse_raw_yrel != 0) {
+            sectors[selected_sectors[ui_hover_index]].floor_y -= input.mouse_raw_yrel;
+            if (sectors[selected_sectors[ui_hover_index]].floor_y >= sectors[selected_sectors[ui_hover_index]].ceiling_y) {
+                sectors[selected_sectors[ui_hover_index]].floor_y = sectors[selected_sectors[ui_hover_index]].ceiling_y - 1;
+            }
+            changing_floor_or_ceiling = true;
+        }
+
+        if ((input.is_action_just_released[INPUT_UP] || input.is_action_just_released[INPUT_DOWN]) && changing_floor_or_ceiling) {
+            changing_floor_or_ceiling = false;
+            level_init_sectors();
         }
     }
 }
@@ -273,13 +343,27 @@ void edit_render() {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderFillRect(renderer, &ui_rect);
 
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    if (ui_hover_index != -1) {
+        SDL_RenderDrawRect(renderer, &ui_hover_box[ui_hover_index]);
+    }
+
+    text_y_offset = 5;
     if (mode == MODE_SECTOR) {
-        edit_render_text("Sector Mode", ui_rect.x + 5, ui_rect.y + 5);
-        edit_render_text(std::to_string(selected_sectors.size()) + " selected", ui_rect.x + 5, ui_rect.y + 5 + 12);
-        // edit_render_text("Floor/Ceil Y: " + std::to_string())
+        edit_render_ui_text("Sector Mode");
+        for (unsigned int selected_sector : selected_sectors) {
+            edit_render_ui_text("Sector " + std::to_string(selected_sector));
+            edit_render_ui_text("ceil: " + std::to_string(sectors[selected_sector].ceiling_y));
+            edit_render_ui_text("floor: " + std::to_string(sectors[selected_sector].floor_y));
+        }
     }
 
     SDL_RenderPresent(renderer);
+}
+
+void edit_render_ui_text(std::string text) {
+    edit_render_text(text, ui_rect.x + 5, ui_rect.y + text_y_offset);
+    text_y_offset += 12;
 }
 
 void edit_render_text(std::string text, int x, int y) {

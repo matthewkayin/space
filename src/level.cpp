@@ -46,6 +46,8 @@ void Sector::add_vertex(const glm::vec2 vertex, bool add_wall) {
 }
 
 void Sector::init_buffers() {
+    std::vector<VertexData> vertex_data;
+
     // walls
     for (unsigned int i = 0; i < vertices.size(); i++) {
         if (!walls[i].exists) {
@@ -152,8 +154,10 @@ void Sector::init_buffers() {
         }
     }
 
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
+    if (!has_generated_buffers) {
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+    }
 
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -176,7 +180,6 @@ void Sector::init_buffers() {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     vertex_data_size = vertex_data.size();
-    vertex_data.clear();
 }
 
 void Sector::render() {
@@ -264,10 +267,6 @@ bool level_init() {
     b.ceiling_y = 3.0f;
     sectors.push_back(b);
 
-    for (unsigned int i = 0; i < sectors.size(); i++) {
-        sectors[i].init_buffers();
-    }
-
     // create lights
     PointLight light = {
         .position = glm::vec3(-2.8, 1.5f, 4.8f),
@@ -299,7 +298,15 @@ bool level_init() {
     glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.cutoff"), glm::cos(glm::radians(12.5f)));
     glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.outer_cutoff"), glm::cos(glm::radians(17.5f)));
 
+    level_init_sectors();
+
     return true;
+}
+
+void level_init_sectors() {
+    for (unsigned int i = 0; i < sectors.size(); i++) {
+        sectors[i].init_buffers();
+    }
 }
 
 void level_update(float delta) {
