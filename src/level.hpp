@@ -14,6 +14,7 @@ struct VertexData {
 
 struct Wall {
     bool exists;
+    unsigned int texture_index;
     glm::vec3 normal;
 };
 
@@ -29,6 +30,8 @@ struct Sector {
     std::vector<glm::vec2> vertices;
     float floor_y;
     float ceiling_y;
+    unsigned int floor_texture_index;
+    unsigned int ceiling_texture_index;
 
     std::vector<Wall> walls;
     glm::vec2 aabb_top_left;
@@ -39,10 +42,9 @@ struct Sector {
     unsigned int vao, vbo;
     unsigned int vertex_data_size;
 
-    Sector() {
-        has_generated_buffers = false;
-    }
-    void add_vertex(const glm::vec2 vertex, bool add_wall);
+    Sector();
+    ~Sector();
+    void add_vertex(const glm::vec2 vertex, unsigned int texture_index, bool wall_exists);
     void init_buffers();
     void render();
 };

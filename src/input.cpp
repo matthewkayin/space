@@ -23,6 +23,9 @@ void input_set_mapping() {
     input_map.insert({ SDLK_RIGHT, INPUT_ROTATE_RIGHT });
     input_map.insert({ SDLK_LEFT, INPUT_ROTATE_LEFT });
     input_map.insert({ SDLK_LCTRL, INPUT_CTRL });
+    input_map.insert({ SDLK_DELETE, INPUT_DELETE });
+    input_map.insert({ SDLK_t, INPUT_T });
+    input_map.insert({ SDLK_g, INPUT_G });
 }
 
 void input_prime_state() {

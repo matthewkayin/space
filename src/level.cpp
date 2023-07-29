@@ -37,10 +37,24 @@ float raycast(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm
     return a_time;
 }
 
-void Sector::add_vertex(const glm::vec2 vertex, bool add_wall) {
+Sector::Sector() {
+    has_generated_buffers = false;
+    floor_y = 0.0f;
+    ceiling_y = 1.0f;
+    ceiling_texture_index = 0;
+    floor_texture_index = 0;
+}
+
+Sector::~Sector() {
+    glDeleteBuffers(1, &vbo);
+    glDeleteVertexArrays(1, &vao);
+}
+
+void Sector::add_vertex(const glm::vec2 vertex, unsigned int texture_index, bool wall_exists) {
     vertices.push_back(vertex);
     walls.push_back({
-        .exists = add_wall,
+        .exists = wall_exists,
+        .texture_index = texture_index,
         .normal = glm::vec3(0.0f, 0.0f, 0.0f)
     });
 }
@@ -89,7 +103,7 @@ void Sector::init_buffers() {
                 vertex_data.push_back({
                     .position = wall_vertices[base_index + j],
                     .normal = face_normal,
-                    .texture_index = 0,
+                    .texture_index = walls[i].texture_index,
                     .texture_coordinates = texture_coordinates[base_index + j]
                 });
             }
@@ -119,11 +133,13 @@ void Sector::init_buffers() {
     aabb[7] = glm::vec4(aabb_bot_right.x, floor_y, aabb_bot_right.y, 1.0f);
 
     // ceiling and floor
+    // first, divide ceiling polygon into triangles by looking for ear triangles
     std::vector<unsigned int> remaining_vertices;
     std::vector<glm::ivec3> ceiling_triangle_vertices;
     for (unsigned int i = 0; i < vertices.size(); i++) {
         remaining_vertices.push_back(i);
     }
+    // when there are only three vertices remaining, we can break out of this loop and add the last three as a triangle
     while (remaining_vertices.size() > 3) {
         unsigned int ear_vertex;
         for (unsigned int i = 0; i < remaining_vertices.size(); i++) {
@@ -131,6 +147,7 @@ void Sector::init_buffers() {
             unsigned int left_vertex = remaining_vertices[(i + remaining_vertices.size() - 1) % remaining_vertices.size()];
             unsigned int right_vertex = remaining_vertices[(i + 1) % remaining_vertices.size()];
 
+            // check that the candidate triangle is concave
             glm::vec2 left_vertex_vector = vertices[left_vertex] - vertices[candidate_vertex];
             glm::vec2 right_vertex_vector = vertices[right_vertex] - vertices[candidate_vertex];
             float angle = glm::degrees(acos(glm::dot(glm::normalize(left_vertex_vector), glm::normalize(right_vertex_vector))));
@@ -139,6 +156,7 @@ void Sector::init_buffers() {
                 continue;
             }
 
+            // then check that no other points lie inside the candidate triangle
             glm::vec2 a = vertices[candidate_vertex];
             glm::vec2 b = vertices[left_vertex];
             glm::vec2 c = vertices[right_vertex];
@@ -161,6 +179,7 @@ void Sector::init_buffers() {
                 }
             }
 
+            // if candidate is concave and contains no other points, it's valid and gets added to triangles list
             if (abc_is_valid_ear) {
                 ceiling_triangle_vertices.push_back(glm::ivec3(candidate_vertex, right_vertex, left_vertex));
                 remaining_vertices.erase(remaining_vertices.begin() + i);
@@ -168,8 +187,10 @@ void Sector::init_buffers() {
             }
         }
     }
+    // add the last triangle
     ceiling_triangle_vertices.push_back(glm::ivec3(remaining_vertices[0], remaining_vertices[1], remaining_vertices[2]));
 
+    // make ceiling and floor triangles out of the triangles formed above
     glm::vec2 ceiling_scale = glm::vec2(std::fabs(aabb_bot_right.x - aabb_top_left.x), std::fabs(aabb_top_left.y - aabb_bot_right.y));
     for (glm::ivec3 ceiling_triangle : ceiling_triangle_vertices) {
         glm::vec3 triangle_vertices[3] = {
@@ -182,7 +203,7 @@ void Sector::init_buffers() {
             vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
-                .texture_index = 0,
+                .texture_index = ceiling_texture_index,
                 .texture_coordinates = glm::vec2(
                         ((triangle_vertices[j].x - aabb_top_left.x) / ceiling_scale.x) * ceiling_scale.x,
                         (std::fabs(triangle_vertices[j].z - aabb_bot_right.y) / ceiling_scale.y) * ceiling_scale.y)
@@ -197,7 +218,7 @@ void Sector::init_buffers() {
             vertex_data.push_back({
                 .position = triangle_vertices[j],
                 .normal = face_normal,
-                .texture_index = 0,
+                .texture_index = floor_texture_index,
                 .texture_coordinates = glm::vec2(
                         ((triangle_vertices[j].x - aabb_top_left.x) / ceiling_scale.x) * ceiling_scale.x,
                         (std::fabs(triangle_vertices[j].z - aabb_bot_right.y) / ceiling_scale.y) * ceiling_scale.y)
@@ -205,6 +226,7 @@ void Sector::init_buffers() {
         }
     }
 
+    // insert vertex data into buffers
     if (!has_generated_buffers) {
         glGenVertexArrays(1, &vao);
         glGenBuffers(1, &vbo);
@@ -272,10 +294,9 @@ bool level_init() {
     glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
 
     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, 64, 64, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    const char* paths[2] = { "./res/texture/BRICK_1A.png", "./res/texture/CONSOLE_1B.png" };
-    for (unsigned int i = 0; i < 2; i++) {
+    for (unsigned int i = 0; i < NUM_TEXTURES; i++) {
         int width, height, num_channels;
-        unsigned char* data = stbi_load(paths[i], &width, &height, &num_channels, 0);
+        unsigned char* data = stbi_load(("./res/texture/" + std::to_string(i) + ".png").c_str(), &width, &height, &num_channels, 0);
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, 64, 64, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
         stbi_image_free(data);
     }
@@ -300,20 +321,20 @@ bool level_init() {
 
     // create sectors
     Sector a;
-    a.add_vertex(glm::vec2(-3.0f, -1.0f), true);
-    a.add_vertex(glm::vec2(0.0f, -5.0f), false);
-    a.add_vertex(glm::vec2(3.0f, -1.0f), true);
-    a.add_vertex(glm::vec2(3.0f, 5.0f), true);
-    a.add_vertex(glm::vec2(-3.0f, 5.0f), true);
+    a.add_vertex(glm::vec2(-3.0f, -1.0f), 0, true);
+    a.add_vertex(glm::vec2(0.0f, -5.0f), 0, false);
+    a.add_vertex(glm::vec2(3.0f, -1.0f), 0, true);
+    a.add_vertex(glm::vec2(3.0f, 5.0f), 0, true);
+    a.add_vertex(glm::vec2(-3.0f, 5.0f), 0, true);
     a.floor_y = 0.0f;
     a.ceiling_y = 3.0f;
     sectors.push_back(a);
 
     Sector b;
-    b.add_vertex(glm::vec2(3.0f, -9.0f), true);
-    b.add_vertex(glm::vec2(6.0f, -5.0f), true);
-    b.add_vertex(glm::vec2(3.0f, -1.0f), false);
-    b.add_vertex(glm::vec2(0.0f, -5.0f), true);
+    b.add_vertex(glm::vec2(3.0f, -9.0f), 0, true);
+    b.add_vertex(glm::vec2(6.0f, -5.0f), 0, true);
+    b.add_vertex(glm::vec2(3.0f, -1.0f), 0, false);
+    b.add_vertex(glm::vec2(0.0f, -5.0f), 0, true);
     b.floor_y = 0.0f;
     b.ceiling_y = 3.0f;
     sectors.push_back(b);
