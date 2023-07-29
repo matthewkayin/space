@@ -119,12 +119,63 @@ void Sector::init_buffers() {
     aabb[7] = glm::vec4(aabb_bot_right.x, floor_y, aabb_bot_right.y, 1.0f);
 
     // ceiling and floor
+    std::vector<unsigned int> remaining_vertices;
+    std::vector<glm::ivec3> ceiling_triangle_vertices;
+    for (unsigned int i = 0; i < vertices.size(); i++) {
+        remaining_vertices.push_back(i);
+    }
+    while (remaining_vertices.size() > 3) {
+        unsigned int ear_vertex;
+        for (unsigned int i = 0; i < remaining_vertices.size(); i++) {
+            unsigned int candidate_vertex = remaining_vertices[i];
+            unsigned int left_vertex = remaining_vertices[(i + remaining_vertices.size() - 1) % remaining_vertices.size()];
+            unsigned int right_vertex = remaining_vertices[(i + 1) % remaining_vertices.size()];
+
+            glm::vec2 left_vertex_vector = vertices[left_vertex] - vertices[candidate_vertex];
+            glm::vec2 right_vertex_vector = vertices[right_vertex] - vertices[candidate_vertex];
+            float angle = glm::degrees(acos(glm::dot(glm::normalize(left_vertex_vector), glm::normalize(right_vertex_vector))));
+
+            if (angle >= 180) {
+                continue;
+            }
+
+            glm::vec2 a = vertices[candidate_vertex];
+            glm::vec2 b = vertices[left_vertex];
+            glm::vec2 c = vertices[right_vertex];
+            bool abc_is_valid_ear = true;
+            for (unsigned int j = 0; j < remaining_vertices.size(); j++) {
+                if (remaining_vertices[j] == candidate_vertex || remaining_vertices[j] == left_vertex || remaining_vertices[j] == right_vertex) {
+                    continue;
+                }
+
+                glm::vec2 p = vertices[remaining_vertices[j]];
+                float A = abs((a.x*(b.y - c.y) + b.x*(c.y - a.y) + c.x*(a.y - b.y)) / 2.0f);
+                float A1 = abs((p.x*(b.y - c.y) + b.x*(c.y - p.y) + c.x*(p.y - b.y)) / 2.0f);
+                float A2 = abs((a.x*(p.y - c.y) + p.x*(c.y - a.y) + c.x*(a.y - p.y)) / 2.0f);
+                float A3 = abs((a.x*(b.y - p.y) + b.x*(p.y - a.y) + p.x*(a.y - b.y)) / 2.0f);
+
+                bool is_p_inside_abc = A == A1 + A2 + A3;
+                if (is_p_inside_abc) {
+                    abc_is_valid_ear = false;
+                    break;
+                }
+            }
+
+            if (abc_is_valid_ear) {
+                ceiling_triangle_vertices.push_back(glm::ivec3(candidate_vertex, right_vertex, left_vertex));
+                remaining_vertices.erase(remaining_vertices.begin() + i);
+                break;
+            }
+        }
+    }
+    ceiling_triangle_vertices.push_back(glm::ivec3(remaining_vertices[0], remaining_vertices[1], remaining_vertices[2]));
+
     glm::vec2 ceiling_scale = glm::vec2(std::fabs(aabb_bot_right.x - aabb_top_left.x), std::fabs(aabb_top_left.y - aabb_bot_right.y));
-    for (unsigned int i = 2; i < vertices.size(); i++) {
+    for (glm::ivec3 ceiling_triangle : ceiling_triangle_vertices) {
         glm::vec3 triangle_vertices[3] = {
-            glm::vec3(vertices[0].x, ceiling_y, vertices[0].y),
-            glm::vec3(vertices[i - 1].x, ceiling_y, vertices[i - 1].y),
-            glm::vec3(vertices[i].x, ceiling_y, vertices[i].y),
+            glm::vec3(vertices[ceiling_triangle[0]].x, ceiling_y, vertices[ceiling_triangle[0]].y),
+            glm::vec3(vertices[ceiling_triangle[1]].x, ceiling_y, vertices[ceiling_triangle[1]].y),
+            glm::vec3(vertices[ceiling_triangle[2]].x, ceiling_y, vertices[ceiling_triangle[2]].y),
         };
         glm::vec3 face_normal = glm::normalize(glm::cross(triangle_vertices[1] - triangle_vertices[0], triangle_vertices[2] - triangle_vertices[0]));
         for (unsigned int j = 0; j < 3; j++) {
