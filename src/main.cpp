@@ -133,11 +133,9 @@ int main(int argc, char** argv) {
                 } else {
                     running = false;
                 }
-            } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == 1 && SDL_GetRelativeMouseMode() == SDL_FALSE) {
-                if (!edit_mode || e.button.windowID == main_window_id) {
-                    SDL_SetRelativeMouseMode(SDL_TRUE);
-                }
-            } else if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
+            } else if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && SDL_GetRelativeMouseMode() == SDL_FALSE && (!edit_mode || e.button.windowID == main_window_id)) {
+                SDL_SetRelativeMouseMode(SDL_TRUE);
+            } else if (SDL_GetRelativeMouseMode() == SDL_TRUE || edit_mode) {
                 input_handle_event(e);
             }
         }
@@ -149,7 +147,7 @@ int main(int argc, char** argv) {
             if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
                 level_edit_update(delta);
             } else {
-                // editor update
+                edit_update();
             }
         }
 

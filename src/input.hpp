@@ -3,6 +3,9 @@
 #include <SDL2/SDL.h>
 
 enum Input {
+    INPUT_LCLICK,
+    INPUT_RCLICK,
+    INPUT_CTRL,
     INPUT_FORWARD,
     INPUT_BACKWARD,
     INPUT_RIGHT,
@@ -20,8 +23,11 @@ enum Input {
 struct InputState {
     bool is_action_pressed[INPUT_COUNT];
     bool is_action_just_pressed[INPUT_COUNT];
+    bool is_action_just_released[INPUT_COUNT];
     float mouse_raw_xrel;
     float mouse_raw_yrel;
+    float mouse_raw_x;
+    float mouse_raw_y;
     float mouse_x;
     float mouse_y;
 };
