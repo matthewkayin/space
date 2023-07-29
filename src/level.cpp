@@ -502,7 +502,7 @@ void level_edit_update(float delta) {
         camera_velocity += glm::vec3(0.0f, 1.0f, 0.0f);
     }
     if (input.is_action_pressed[INPUT_DOWN]) {
-        camera_velocity += glm::vec3(0.0f, -1.0f, 1.0f);
+        camera_velocity += glm::vec3(0.0f, -1.0f, 0.0f);
     }
     if (input.is_action_pressed[INPUT_LEFT]) {
         camera_velocity += -glm::normalize(glm::cross(camera_direction, glm::vec3(0.0f, 1.0f, 0.0f)));
