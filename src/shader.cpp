@@ -7,6 +7,30 @@
 #include <cstdio>
 #include <sstream>
 
+unsigned int text_shader;
+unsigned int texture_shader;
+unsigned int gun_shader;
+unsigned int screen_shader;
+
+bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragment_path);
+
+bool shader_compile_all() {
+    if (!shader_compile(&text_shader, "./shader/text_vertex.glsl", "./shader/text_fragment.glsl")) {
+        return false;
+    }
+    if (!shader_compile(&texture_shader, "./shader/texture_vertex.glsl", "./shader/texture_fragment.glsl")) {
+        return false;
+    }
+    if (!shader_compile(&gun_shader, "./shader/gun_vertex.glsl", "./shader/gun_fragment.glsl")) {
+        return false;
+    }
+    if (!shader_compile(&screen_shader, "./shader/screen_vertex.glsl", "./shader/screen_fragment.glsl")) {
+        return false;
+    }
+
+    return true;
+}
+
 bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragment_path) {
     std::string vertex_code;
     std::string fragment_code;
@@ -31,8 +55,8 @@ bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragm
 
         vertex_code = vertex_shader_stream.str();
         fragment_code = fragment_shader_stream.str();
-    } catch (std::ifstream::failure e) {
-        printf("Error: shader file not successfully read\n");
+    } catch (std::exception& e) {
+        printf("Error: shader file (%s, %s) not successfully read\n", vertex_path, fragment_path);
         return false;
     }
 
@@ -50,7 +74,7 @@ bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragm
     glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(vertex, 512, NULL, info_log);
-        printf("Error: vertex shader compilation failed\n%s\n", info_log);
+        printf("Error: vertex shader %s compilation failed\n%s\n", vertex_path, info_log);
         return false;
     }
 
@@ -60,7 +84,7 @@ bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragm
     glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(fragment, 512, NULL, info_log);
-        printf("Error: fragment shader compilation failed\n%s\n", info_log);
+        printf("Error: fragment shader %s compilation failed\n%s\n", fragment_path, info_log);
         return false;
     }
 
@@ -71,7 +95,7 @@ bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragm
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) {
         glGetProgramInfoLog(program, 512, NULL, info_log);
-        printf("Error linking shader program\n%s\n", info_log);
+        printf("Error linking shader program (%s %s) \n%s\n", vertex_path, fragment_path, info_log);
         return false;
     }
 

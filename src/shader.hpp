@@ -4,4 +4,9 @@
 
 #include <string>
 
-bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragment_path);
+extern unsigned int text_shader;
+extern unsigned int texture_shader;
+extern unsigned int gun_shader;
+extern unsigned int screen_shader;
+
+bool shader_compile_all();

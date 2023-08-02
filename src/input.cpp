@@ -18,10 +18,7 @@ void input_set_mapping() {
     input_map.insert({ SDLK_e, INPUT_UP });
     input_map.insert({ SDLK_q, INPUT_DOWN });
     input_map.insert({ SDLK_LSHIFT, INPUT_YAW_ROLL });
-    input_map.insert({ SDLK_UP, INPUT_ROTATE_UP });
-    input_map.insert({ SDLK_DOWN, INPUT_ROTATE_DOWN });
-    input_map.insert({ SDLK_RIGHT, INPUT_ROTATE_RIGHT });
-    input_map.insert({ SDLK_LEFT, INPUT_ROTATE_LEFT });
+    input_map.insert({ SDLK_f, INPUT_FLASHLIGHT });
     input_map.insert({ SDLK_LCTRL, INPUT_CTRL });
     input_map.insert({ SDLK_DELETE, INPUT_DELETE });
     input_map.insert({ SDLK_t, INPUT_T });

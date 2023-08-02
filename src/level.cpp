@@ -3,6 +3,7 @@
 #include "shader.hpp"
 #include "input.hpp"
 #include "globals.hpp"
+#include "resource.hpp"
 
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -11,12 +12,8 @@
 
 #include <cstdio>
 
-unsigned int texture_shader;
-unsigned int texture_array;
-
 std::vector<Sector> sectors;
 std::vector<PointLight> lights;
-Player player;
 
 float camera_yaw = -90.0f;
 float camera_pitch = 0.0f;
@@ -141,7 +138,6 @@ void Sector::init_buffers() {
     }
     // when there are only three vertices remaining, we can break out of this loop and add the last three as a triangle
     while (remaining_vertices.size() > 3) {
-        unsigned int ear_vertex;
         for (unsigned int i = 0; i < remaining_vertices.size(); i++) {
             unsigned int candidate_vertex = remaining_vertices[i];
             unsigned int left_vertex = remaining_vertices[(i + remaining_vertices.size() - 1) % remaining_vertices.size()];
@@ -287,38 +283,7 @@ bool Frustum::is_inside(const Sector& sector) const {
     return true;
 }
 
-bool level_init() {
-    // load texture array
-    glGenTextures(1, &texture_array);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, texture_array);
-
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, 64, 64, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    for (unsigned int i = 0; i < NUM_TEXTURES; i++) {
-        int width, height, num_channels;
-        unsigned char* data = stbi_load(("./res/texture/" + std::to_string(i) + ".png").c_str(), &width, &height, &num_channels, 0);
-        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, 64, 64, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        stbi_image_free(data);
-    }
-
-    // compile texture shader
-    bool success = shader_compile(&texture_shader, "./shader/texture_vertex.glsl", "./shader/texture_fragment.glsl");
-    if (!success) {
-        return false;
-    }
-
-    glUseProgram(texture_shader);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture_array);
-    glUniform1i(glGetUniformLocation(texture_shader, "texture_array"), 0);
-
-    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
-
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-
+void level_init() {
     // create sectors
     Sector a;
     a.add_vertex(glm::vec2(-3.0f, -1.0f), 0, true);
@@ -352,27 +317,36 @@ bool level_init() {
         .linear = 0.022f,
         .quadratic = 0.0019f
     };
+    lights.push_back(light);
 
-    glUniform1i(glGetUniformLocation(texture_shader, "lighting_enabled"), !edit_mode);
+    glUseProgram(texture_shader);
+    glUniform1i(glGetUniformLocation(texture_shader, "texture_array"), 0);
+    glUniform1ui(glGetUniformLocation(texture_shader, "lighting_enabled"), !edit_mode);
 
-    glUniform1ui(glGetUniformLocation(texture_shader, "point_light_count"), lights.size());
-    for (unsigned int i = 0; i < lights.size(); i++) {
-        std::string shader_var_name = "point_lights[" + std::to_string(i) + "]";
-        glUniform3fv(glGetUniformLocation(texture_shader, (shader_var_name + ".position").c_str()), 1, glm::value_ptr(lights[i].position));
-        glUniform1f(glGetUniformLocation(texture_shader, (shader_var_name + ".constant").c_str()), lights[i].constant);
-        glUniform1f(glGetUniformLocation(texture_shader, (shader_var_name + ".linear").c_str()), lights[i].linear);
-        glUniform1f(glGetUniformLocation(texture_shader, (shader_var_name + ".quadratic").c_str()), lights[i].quadratic);
+    unsigned int shaders_with_lighting[] = { texture_shader, gun_shader };
+
+    for (unsigned int shader_index = 0; shader_index < 2; shader_index++) {
+        unsigned int shader = shaders_with_lighting[shader_index];
+        glUseProgram(shader);
+
+        glUniform1ui(glGetUniformLocation(shader, "point_light_count"), lights.size());
+        for (unsigned int i = 0; i < lights.size(); i++) {
+            std::string shader_var_name = "point_lights[" + std::to_string(i) + "]";
+            glUniform3fv(glGetUniformLocation(shader, (shader_var_name + ".position").c_str()), 1, glm::value_ptr(lights[i].position));
+            glUniform1f(glGetUniformLocation(shader, (shader_var_name + ".constant").c_str()), lights[i].constant);
+            glUniform1f(glGetUniformLocation(shader, (shader_var_name + ".linear").c_str()), lights[i].linear);
+            glUniform1f(glGetUniformLocation(shader, (shader_var_name + ".quadratic").c_str()), lights[i].quadratic);
+        }
+
+        glUniform1f(glGetUniformLocation(shader, "player_flashlight.constant"), 1.0f);
+        glUniform1f(glGetUniformLocation(shader, "player_flashlight.linear"), 0.09);
+        glUniform1f(glGetUniformLocation(shader, "player_flashlight.quadratic"), 0.032f);
+        glUniform1f(glGetUniformLocation(shader, "player_flashlight.cutoff"), glm::cos(glm::radians(12.5f)));
+        glUniform1f(glGetUniformLocation(shader, "player_flashlight.outer_cutoff"), glm::cos(glm::radians(17.5f)));
     }
 
-    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.constant"), 1.0f);
-    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.linear"), 0.09);
-    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.quadratic"), 0.032f);
-    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.cutoff"), glm::cos(glm::radians(12.5f)));
-    glUniform1f(glGetUniformLocation(texture_shader, "player_flashlight.outer_cutoff"), glm::cos(glm::radians(17.5f)));
 
     level_init_sectors();
-
-    return true;
 }
 
 void level_init_sectors() {
@@ -381,104 +355,103 @@ void level_init_sectors() {
     }
 }
 
-void level_update(float delta) {
-    player.update(delta);
-
+void level_move_and_slide(glm::vec3* position, glm::vec3* velocity, float delta) {
     // check collisions and move player
-    if (glm::length(player.velocity) != 0.0f) {
-        glm::vec3 actual_velocity = player.velocity * delta;
-
-        // check if within sector AABB
-        std::vector<Sector*> nearby_sectors;
-        for (unsigned int i = 0; i < sectors.size(); i++) {
-            Sector* sector = &sectors[i];
-            float padding = 1.0f;
-            if (player.position.x < sector->aabb_top_left.x - padding || player.position.x > sector->aabb_bot_right.x + padding ||
-                player.position.y < sector->floor_y || player.position.y > sector->ceiling_y ||
-                player.position.z < sector->aabb_top_left.y - padding || player.position.z > sector->aabb_bot_right.y + padding) {
-                continue;
-            }
-            nearby_sectors.push_back(sector);
-        }
-
-        // check floor / ceiling collisions
-        glm::vec2 origin2d = glm::vec2(player.position.x, player.position.z);
-        for (Sector* sector : nearby_sectors) {
-            glm::vec2 raycast_start = sector->aabb_top_left - glm::vec2(1.0f, 1.0f);
-            glm::vec2 raycast_direction = origin2d - raycast_start;
-            unsigned int hits = 0;
-            for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
-                float raycast_result = raycast(raycast_start, raycast_direction, sector->vertices[wall], sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall]);
-                if (raycast_result != -1.0f) {
-                    hits++;
-                }
-            }
-
-            if (hits % 2 == 0) {
-                continue;
-            }
-
-            float predicted_y = player.position.y + actual_velocity.y;
-            if (predicted_y + 0.5f >= sector->ceiling_y) {
-                glm::vec3 velocity_in_ceiling_normal_direction = glm::vec3(0.0f, -1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, -1.0f, 0.0f));
-                player.velocity -= velocity_in_ceiling_normal_direction;
-                actual_velocity -= velocity_in_ceiling_normal_direction;
-            } else if (predicted_y - 0.5f <= sector->floor_y) {
-                glm::vec3 velocity_in_floor_normal_direction = glm::vec3(0.0f, 1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, 1.0f, 0.0f));
-                player.velocity -= velocity_in_floor_normal_direction;
-                actual_velocity -= velocity_in_floor_normal_direction;
-            }
-        }
-
-        // check wall collisions
-        bool collided = true;
-        unsigned int attempts = 0;
-        while (collided && attempts < 10) {
-            collided = false;
-            attempts++;
-
-            for (Sector* sector : nearby_sectors) {
-                for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
-                    if (!sector->walls[wall].exists) {
-                        continue;
-                    }
-
-                    glm::vec2 velocity2d = glm::vec2(actual_velocity.x, actual_velocity.z);
-                    glm::vec2 predicted_origin2d = origin2d + velocity2d;
-
-                    glm::vec2 wallv = sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall];
-                    glm::vec2 f = sector->vertices[wall] - predicted_origin2d;
-                    float a = glm::dot(wallv, wallv);
-                    float b = 2 * glm::dot(f, wallv);
-                    float c = glm::dot(f, f) - 0.25f;
-                    float discriminant = (b * b) - (4.0f * a * c);
-
-                    if (discriminant < 0.0f) {
-                        continue;
-                    }
-
-                    discriminant = sqrt(discriminant);
-                    float t1 = (-b - discriminant) / (2.0f * a);
-                    float t2 = (-b + discriminant) / (2.0f * a);
-
-                    if (!(t1 >= 0.0f && t1 <= 1.0f) && !(t2 >= 0.0f && t2 <= 1.0f)) {
-                        continue;
-                    }
-
-                    glm::vec3 velocity_in_wall_normal_direction = sector->walls[wall].normal * glm::dot(actual_velocity, sector->walls[wall].normal);
-                    player.velocity -= velocity_in_wall_normal_direction;
-                    actual_velocity = actual_velocity - velocity_in_wall_normal_direction;
-                    collided = true;
-                }
-            }
-        }
-
-        if (attempts == 5) {
-            actual_velocity = glm::vec3(0.0f, 0.0f, 0.0f);
-        }
-
-        player.position += actual_velocity;
+    if (glm::length(*velocity) == 0.0f) {
+        return;
     }
+    glm::vec3 actual_velocity = *velocity * delta;
+
+    // check if within sector AABB
+    std::vector<Sector*> nearby_sectors;
+    for (unsigned int i = 0; i < sectors.size(); i++) {
+        Sector* sector = &sectors[i];
+        float padding = 1.0f;
+        if (position->x < sector->aabb_top_left.x - padding || position->x > sector->aabb_bot_right.x + padding ||
+            position->y < sector->floor_y || position->y > sector->ceiling_y ||
+            position->z < sector->aabb_top_left.y - padding || position->z > sector->aabb_bot_right.y + padding) {
+            continue;
+        }
+        nearby_sectors.push_back(sector);
+    }
+
+    // check floor / ceiling collisions
+    glm::vec2 origin2d = glm::vec2(position->x, position->z);
+    for (Sector* sector : nearby_sectors) {
+        glm::vec2 raycast_start = sector->aabb_top_left - glm::vec2(1.0f, 1.0f);
+        glm::vec2 raycast_direction = origin2d - raycast_start;
+        unsigned int hits = 0;
+        for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
+            float raycast_result = raycast(raycast_start, raycast_direction, sector->vertices[wall], sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall]);
+            if (raycast_result != -1.0f) {
+                hits++;
+            }
+        }
+
+        if (hits % 2 == 0) {
+            continue;
+        }
+
+        float predicted_y = position->y + actual_velocity.y;
+        if (predicted_y + 0.5f >= sector->ceiling_y) {
+            glm::vec3 velocity_in_ceiling_normal_direction = glm::vec3(0.0f, -1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, -1.0f, 0.0f));
+            *velocity -= velocity_in_ceiling_normal_direction;
+            actual_velocity -= velocity_in_ceiling_normal_direction;
+        } else if (predicted_y - 0.5f <= sector->floor_y) {
+            glm::vec3 velocity_in_floor_normal_direction = glm::vec3(0.0f, 1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, 1.0f, 0.0f));
+            *velocity -= velocity_in_floor_normal_direction;
+            actual_velocity -= velocity_in_floor_normal_direction;
+        }
+    }
+
+    // check wall collisions
+    bool collided = true;
+    unsigned int attempts = 0;
+    while (collided && attempts < 10) {
+        collided = false;
+        attempts++;
+
+        for (Sector* sector : nearby_sectors) {
+            for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
+                if (!sector->walls[wall].exists) {
+                    continue;
+                }
+
+                glm::vec2 velocity2d = glm::vec2(actual_velocity.x, actual_velocity.z);
+                glm::vec2 predicted_origin2d = origin2d + velocity2d;
+
+                glm::vec2 wallv = sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall];
+                glm::vec2 f = sector->vertices[wall] - predicted_origin2d;
+                float a = glm::dot(wallv, wallv);
+                float b = 2 * glm::dot(f, wallv);
+                float c = glm::dot(f, f) - 0.25f;
+                float discriminant = (b * b) - (4.0f * a * c);
+
+                if (discriminant < 0.0f) {
+                    continue;
+                }
+
+                discriminant = sqrt(discriminant);
+                float t1 = (-b - discriminant) / (2.0f * a);
+                float t2 = (-b + discriminant) / (2.0f * a);
+
+                if (!(t1 >= 0.0f && t1 <= 1.0f) && !(t2 >= 0.0f && t2 <= 1.0f)) {
+                    continue;
+                }
+
+                glm::vec3 velocity_in_wall_normal_direction = sector->walls[wall].normal * glm::dot(actual_velocity, sector->walls[wall].normal);
+                *velocity -= velocity_in_wall_normal_direction;
+                actual_velocity = actual_velocity - velocity_in_wall_normal_direction;
+                collided = true;
+            }
+        }
+    }
+
+    if (attempts == 5) {
+        actual_velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+
+    *position += actual_velocity;
 }
 
 void level_edit_update(float delta) {
@@ -517,23 +490,23 @@ void level_edit_update(float delta) {
     camera_position += camera_velocity * camera_speed * delta;
 }
 
-void level_render() {
+void level_render(glm::mat4 view, glm::mat4 projection, glm::vec3 view_pos, glm::vec3 flashlight_direction, bool flashlight_on) {
     glUseProgram(texture_shader);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, resource_textures);
 
     // view / projection transformations
-    glm::mat4 view;
-    if (!edit_mode) {
-        view = glm::lookAt(player.position, player.position - glm::vec3(player.basis[2]), glm::vec3(player.basis[1]));
+    /*if (!edit_mode) {
     } else {
         view = glm::lookAt(camera_position, camera_position + camera_direction, glm::vec3(0.0f, 1.0f, 0.0f));
-    }
-    glm::mat4 projection;
-    projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-    glUniformMatrix4fv(glGetUniformLocation(texture_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    }*/
+
+    glUniform1ui(glGetUniformLocation(texture_shader, "flashlight_on"), flashlight_on);
     glUniformMatrix4fv(glGetUniformLocation(texture_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
-    glUniform3fv(glGetUniformLocation(texture_shader, "view_pos"), 1, glm::value_ptr(player.position));
-    glUniform3fv(glGetUniformLocation(texture_shader, "player_flashlight.position"), 1, glm::value_ptr(player.position));
-    glUniform3fv(glGetUniformLocation(texture_shader, "player_flashlight.direction"), 1, glm::value_ptr(player.flashlight_direction));
+    glUniformMatrix4fv(glGetUniformLocation(texture_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+    glUniform3fv(glGetUniformLocation(texture_shader, "view_pos"), 1, glm::value_ptr(view_pos));
+    glUniform3fv(glGetUniformLocation(texture_shader, "player_flashlight.position"), 1, glm::value_ptr(view_pos));
+    glUniform3fv(glGetUniformLocation(texture_shader, "player_flashlight.direction"), 1, glm::value_ptr(flashlight_direction));
 
     glm::mat4 projection_view_transpose = glm::transpose(projection * view);
     Frustum frustum = Frustum(projection_view_transpose);
@@ -544,4 +517,5 @@ void level_render() {
 
         sectors[i].render();
     }
+
 }

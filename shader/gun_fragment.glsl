@@ -19,40 +19,35 @@ struct SpotLight {
     float quadratic;
 };
 
-out vec4 FragColor;
+out vec4 frag_color;
 
-flat in uint texture_index;
 in vec2 texture_coordinate;
 in vec3 frag_pos;
-in vec3 normal;
 
-uniform uint lighting_enabled;
-uniform uint flashlight_on;
-uniform vec3 view_pos;
+uniform vec3 player_direction;
 uniform PointLight point_lights[4];
 uniform uint point_light_count;
 uniform SpotLight player_flashlight;
-uniform sampler2DArray texture_array;
+uniform sampler2DArray gun_texture_array;
+uniform uint frame;
+uniform uint flashlight_on;
 
 vec3 calculate_point_light(PointLight light, vec3 normal, vec3 frag_pos, vec3 view_direction);
 vec3 calculate_spot_light(SpotLight light, vec3 normal, vec3 frag_pos, vec3 view_direction);
 
 void main() {
-    vec3 view_direction = normalize(view_pos - frag_pos);
+    vec3 view_direction = normalize(-frag_pos);
+    vec3 normal = normalize(player_direction);
     vec3 light_result;
-    if (lighting_enabled == 1) {
-        light_result = vec3(1.0, 1.0, 1.0) * 0.025;
-        if (flashlight_on == 1) {
-            light_result += calculate_spot_light(player_flashlight, normal, frag_pos, view_direction);
-        }
-        for (uint i = 0; i < point_light_count; i++) {
-            light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);
-        }
-    } else {
-        light_result = vec3(1.0, 1.0, 1.0);
+    light_result = vec3(1.0, 1.0, 1.0) * 0.025;
+    if (flashlight_on == 1) {
+        light_result += calculate_spot_light(player_flashlight, normal, frag_pos, view_direction);
+    }
+    for (uint i = 0; i < point_light_count; i++) {
+        light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);
     }
 
-    FragColor = vec4(light_result, 1.0) * vec4(texture(texture_array, vec3(texture_coordinate.x, texture_coordinate.y, texture_index)));
+    frag_color = vec4(light_result, 1.0) * texture(gun_texture_array, vec3(texture_coordinate.x, texture_coordinate.y, frame));
 }
 
 vec3 calculate_point_light(PointLight light, vec3 normal, vec3 frag_pos, vec3 view_direction) {

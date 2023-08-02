@@ -57,10 +57,9 @@ struct Frustum {
 
 extern std::vector<Sector> sectors;
 extern std::vector<PointLight> lights;
-extern Player player;
 
-bool level_init();
+void level_init();
 void level_init_sectors();
-void level_update(float delta);
+void level_move_and_slide(glm::vec3* position, glm::vec3* velocity, float delta);
 void level_edit_update(float delta);
-void level_render();
+void level_render(glm::mat4 view, glm::mat4 projection, glm::vec3 view_pos, glm::vec3 flashlight_direction, bool flashlight_on);

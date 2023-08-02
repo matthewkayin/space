@@ -9,6 +9,7 @@ struct Player {
     glm::mat4 basis;
     glm::vec3 rotation_speed;
     glm::vec3 flashlight_direction;
+    bool flashlight_on;
 
     Player();
     void update(float delta);

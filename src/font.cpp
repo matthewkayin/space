@@ -11,11 +11,10 @@
 const int ATLAS_FIRST_CHAR = 32;
 
 unsigned int glyph_vao;
-unsigned int text_shader;
 
 Font font_hack_10pt;
 
-bool font_init() {
+void font_init() {
     // buffer glyph vertex data
     unsigned int glyph_vbo;
 
@@ -41,18 +40,12 @@ bool font_init() {
     glBindVertexArray(0);
 
     // compile text shader
-    bool success = shader_compile(&text_shader, "./shader/text_vertex.glsl", "./shader/text_fragment.glsl");
-    if (!success) {
-        return false;
-    }
     glm::mat4 projection = glm::ortho(0.0f, static_cast<float>(SCREEN_WIDTH), 0.0f, static_cast<float>(SCREEN_HEIGHT));
     glUseProgram(text_shader);
     glUniformMatrix4fv(glGetUniformLocation(text_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 
     // load fonts
     font_hack_10pt = Font("./hack_10pt.bmp", 10);
-
-    return true;
 }
 
 Font::Font(const char* path, unsigned int size) {

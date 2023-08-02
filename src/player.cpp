@@ -6,7 +6,7 @@
 
 #include "input.hpp"
 
-const float MAX_VELOCITY = 0.2f;
+const float MAX_VELOCITY = 2.0f;
 const float ACCELERATION = 0.01f;
 const glm::vec3 MAX_ROTATION_SPEED = glm::vec3(0.2f, 0.1f, 0.2f);
 const glm::vec3 ROTATION_ACCEL = glm::vec3(0.05f, 0.05f, 0.05f);
@@ -18,6 +18,7 @@ Player::Player() {
     basis = glm::mat4(1.0f);
     rotation_speed = glm::vec3(0.0f, 0.0f, 0.0f);
     flashlight_direction = -glm::vec3(basis[2]);
+    flashlight_on = false;
 }
 
 void Player::update(float delta) {
@@ -36,16 +37,6 @@ void Player::update(float delta) {
 
     // rotation input
     glm::vec3 rotation_input = glm::vec3(0.0f, -input.mouse_y, -input.mouse_x);
-    if (input.is_action_pressed[INPUT_ROTATE_UP]) {
-        rotation_input.y = 1.0f;
-    } else if (input.is_action_pressed[INPUT_ROTATE_DOWN]) {
-        rotation_input.y = -1.0f;
-    }
-    if (input.is_action_pressed[INPUT_ROTATE_RIGHT]) {
-        rotation_input.z = -1.0f;
-    } else if (input.is_action_pressed[INPUT_ROTATE_LEFT]) {
-        rotation_input.z = 1.0f;
-    }
     if (input.is_action_pressed[INPUT_YAW_ROLL]) {
         rotation_input.x = rotation_input.z;
         rotation_input.z = 0;
@@ -63,6 +54,9 @@ void Player::update(float delta) {
     basis = glm::rotate(glm::mat4(1.0f), rotation_speed.z * delta, glm::vec3(basis[1])) * basis;
 
     // lerp flashlight
+    if (input.is_action_just_pressed[INPUT_FLASHLIGHT]) {
+        flashlight_on = !flashlight_on;
+    }
     flashlight_direction = flashlight_direction + ((-glm::vec3(basis[2]) - flashlight_direction) * delta);
 
     // calculate acceleration
