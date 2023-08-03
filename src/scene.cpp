@@ -32,7 +32,7 @@ void scene_update(float delta) {
 }
 
 void scene_render() {
-    glm::vec3 player_direction = player.position - glm::vec3(player.basis[2]);
+    glm::vec3 player_direction = player.position - player.direction;
     glm::mat4 view;
     view = glm::lookAt(player.position, player_direction, glm::vec3(player.basis[1]));
     glm::mat4 projection;
