@@ -11,6 +11,7 @@ unsigned int text_shader;
 unsigned int texture_shader;
 unsigned int gun_shader;
 unsigned int screen_shader;
+unsigned int ui_shader;
 
 bool shader_compile(unsigned int* id, const char* vertex_path, const char* fragment_path);
 
@@ -25,6 +26,9 @@ bool shader_compile_all() {
         return false;
     }
     if (!shader_compile(&screen_shader, "./shader/screen_vertex.glsl", "./shader/screen_fragment.glsl")) {
+        return false;
+    }
+    if (!shader_compile(&ui_shader, "./shader/ui_vertex.glsl", "./shader/ui_fragment.glsl")) {
         return false;
     }
 
