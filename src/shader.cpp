@@ -9,7 +9,7 @@
 
 unsigned int text_shader;
 unsigned int texture_shader;
-unsigned int gun_shader;
+unsigned int billboard_shader;
 unsigned int screen_shader;
 unsigned int ui_shader;
 
@@ -22,7 +22,7 @@ bool shader_compile_all() {
     if (!shader_compile(&texture_shader, "./shader/texture_vertex.glsl", "./shader/texture_fragment.glsl")) {
         return false;
     }
-    if (!shader_compile(&gun_shader, "./shader/gun_vertex.glsl", "./shader/gun_fragment.glsl")) {
+    if (!shader_compile(&billboard_shader, "./shader/billboard_vertex.glsl", "./shader/billboard_fragment.glsl")) {
         return false;
     }
     if (!shader_compile(&screen_shader, "./shader/screen_vertex.glsl", "./shader/screen_fragment.glsl")) {

@@ -4,6 +4,7 @@
 #include "input.hpp"
 #include "globals.hpp"
 #include "resource.hpp"
+#include "raycast.hpp"
 
 #include <glad/glad.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -109,6 +110,14 @@ void Sector::init_buffers() {
                 walls[i].normal = face_normal;
             }
         }
+
+        raycast_add_plane({
+            .a = wall_top_left,
+            .b = wall_top_right,
+            .c = wall_bot_right,
+            .d = wall_bot_left,
+            .normal = walls[i].normal
+        });
     }
 
     // determine AABB
@@ -120,14 +129,32 @@ void Sector::init_buffers() {
         aabb_bot_right.x = std::max(aabb_bot_right.x, vertices[i].x);
         aabb_bot_right.y = std::max(aabb_bot_right.y, vertices[i].y);
     }
-    aabb[0] = glm::vec4(aabb_top_left.x, ceiling_y, aabb_top_left.y, 1.0f);
-    aabb[1] = glm::vec4(aabb_bot_right.x, ceiling_y, aabb_top_left.y, 1.0f);
-    aabb[2] = glm::vec4(aabb_top_left.x, ceiling_y, aabb_bot_right.y, 1.0f);
-    aabb[3] = glm::vec4(aabb_bot_right.x, ceiling_y, aabb_bot_right.y, 1.0f);
-    aabb[4] = glm::vec4(aabb_top_left.x, floor_y, aabb_top_left.y, 1.0f);
-    aabb[5] = glm::vec4(aabb_bot_right.x, floor_y, aabb_top_left.y, 1.0f);
-    aabb[6] = glm::vec4(aabb_top_left.x, floor_y, aabb_bot_right.y, 1.0f);
-    aabb[7] = glm::vec4(aabb_bot_right.x, floor_y, aabb_bot_right.y, 1.0f);
+    aabb[0] = glm::vec4(aabb_top_left.x, ceiling_y, aabb_top_left.y, 1.0f); // ceil top left
+    aabb[1] = glm::vec4(aabb_bot_right.x, ceiling_y, aabb_top_left.y, 1.0f); // ceil top right
+    aabb[2] = glm::vec4(aabb_bot_right.x, ceiling_y, aabb_bot_right.y, 1.0f); // ceil bot right
+    aabb[3] = glm::vec4(aabb_top_left.x, ceiling_y, aabb_bot_right.y, 1.0f);  // ceil bot left
+    aabb[4] = glm::vec4(aabb_top_left.x, floor_y, aabb_top_left.y, 1.0f); // floor top left
+    aabb[5] = glm::vec4(aabb_bot_right.x, floor_y, aabb_top_left.y, 1.0f); // floor top right
+    aabb[6] = glm::vec4(aabb_bot_right.x, floor_y, aabb_bot_right.y, 1.0f); // floor bot right
+    aabb[7] = glm::vec4(aabb_top_left.x, floor_y, aabb_bot_right.y, 1.0f); // floor bot left
+
+    // ceiling
+    raycast_add_plane({
+        .a = aabb[0],
+        .b = aabb[1],
+        .c = aabb[2],
+        .d = aabb[3],
+        .normal = glm::vec3(0.0f, -1.0f, 0.0f)
+    });
+
+    // floor
+    raycast_add_plane({
+        .a = aabb[4],
+        .b = aabb[5],
+        .c = aabb[6],
+        .d = aabb[7],
+        .normal = glm::vec3(0.0f, 1.0f, 0.0f)
+    });
 
     // ceiling and floor
     // first, divide ceiling polygon into triangles by looking for ear triangles
@@ -323,7 +350,7 @@ void level_init() {
     glUniform1i(glGetUniformLocation(texture_shader, "texture_array"), 0);
     glUniform1ui(glGetUniformLocation(texture_shader, "lighting_enabled"), !edit_mode);
 
-    unsigned int shaders_with_lighting[] = { texture_shader, gun_shader };
+    unsigned int shaders_with_lighting[] = { texture_shader, billboard_shader };
 
     for (unsigned int shader_index = 0; shader_index < 2; shader_index++) {
         unsigned int shader = shaders_with_lighting[shader_index];
@@ -345,11 +372,11 @@ void level_init() {
         glUniform1f(glGetUniformLocation(shader, "player_flashlight.outer_cutoff"), glm::cos(glm::radians(17.5f)));
     }
 
-
     level_init_sectors();
 }
 
 void level_init_sectors() {
+    raycast_planes.clear();
     for (unsigned int i = 0; i < sectors.size(); i++) {
         sectors[i].init_buffers();
     }

@@ -24,11 +24,14 @@ out vec4 frag_color;
 in vec2 texture_coordinate;
 in vec3 frag_pos;
 
-uniform vec3 player_direction;
+uniform vec3 view_pos;
+uniform vec3 normal;
+
 uniform PointLight point_lights[4];
 uniform uint point_light_count;
 uniform SpotLight player_flashlight;
-uniform sampler2DArray gun_texture_array;
+
+uniform sampler2DArray u_texture_array;
 uniform uint frame;
 uniform uint flashlight_on;
 
@@ -36,18 +39,19 @@ vec3 calculate_point_light(PointLight light, vec3 normal, vec3 frag_pos, vec3 vi
 vec3 calculate_spot_light(SpotLight light, vec3 normal, vec3 frag_pos, vec3 view_direction);
 
 void main() {
-    vec3 view_direction = normalize(-frag_pos);
-    vec3 normal = normalize(player_direction);
+    vec3 view_direction = normalize(view_pos - frag_pos);
+
     vec3 light_result;
     light_result = vec3(1.0, 1.0, 1.0) * 0.025;
     if (flashlight_on == 1) {
-        light_result += calculate_spot_light(player_flashlight, normal, frag_pos, view_direction);
+        light_result += calculate_spot_light(player_flashlight, vec3(0, 0, 1), frag_pos, view_direction);
     }
     for (uint i = 0; i < point_light_count; i++) {
-        light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);
+        light_result += calculate_point_light(point_lights[i], vec3(0, 0, 1), frag_pos, view_direction);
     }
 
-    frag_color = vec4(light_result, 1.0) * texture(gun_texture_array, vec3(texture_coordinate.x, texture_coordinate.y, frame));
+    vec4 sampled = texture(u_texture_array, vec3(texture_coordinate.x, texture_coordinate.y, frame));
+    frag_color = vec4(light_result, 1.0) * sampled;
 }
 
 vec3 calculate_point_light(PointLight light, vec3 normal, vec3 frag_pos, vec3 view_direction) {
