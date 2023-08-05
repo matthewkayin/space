@@ -42,12 +42,13 @@ void main() {
     vec3 view_direction = normalize(view_pos - frag_pos);
 
     vec3 light_result;
-    light_result = vec3(1.0, 1.0, 1.0) * 0.025;
+    // light_result = vec3(1.0, 1.0, 1.0) * 0.025;
+    light_result = vec3(0.0, 0.0, 0.0);
     if (flashlight_on == 1) {
-        light_result += calculate_spot_light(player_flashlight, vec3(0, 0, 1), frag_pos, view_direction);
+        light_result += calculate_spot_light(player_flashlight, normal, frag_pos, view_direction);
     }
     for (uint i = 0; i < point_light_count; i++) {
-        light_result += calculate_point_light(point_lights[i], vec3(0, 0, 1), frag_pos, view_direction);
+        light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);
     }
 
     vec4 sampled = texture(u_texture_array, vec3(texture_coordinate.x, texture_coordinate.y, frame));

@@ -94,11 +94,12 @@ float player_recoil_cooldown = 0.1f;
 std::vector<BulletHole> bullet_holes;
 
 void scene_init() {
+    glm::ivec2 screen_size = glm::ivec2(SCREEN_WIDTH, SCREEN_HEIGHT);
     glUseProgram(billboard_shader);
     glUniform1i(glGetUniformLocation(billboard_shader, "u_texture_array"), 0);
     glUniform1ui(glGetUniformLocation(billboard_shader, "frame"), 0);
+    glUniform2iv(glGetUniformLocation(billboard_shader, "screen_size"), 1, glm::value_ptr(screen_size));
     glUseProgram(ui_shader);
-    glm::ivec2 screen_size = glm::ivec2(SCREEN_WIDTH, SCREEN_HEIGHT);
     glUniform2iv(glGetUniformLocation(ui_shader, "screen_size"), 1, glm::value_ptr(screen_size));
 
     player_position = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -261,13 +262,13 @@ void scene_render() {
     glBindVertexArray(quad_vao);
 
     // render bullet holes
+    glUniform2iv(glGetUniformLocation(billboard_shader, "extents"), 1, glm::value_ptr(resource_extents[resource_bullet_hole]));
     for (const BulletHole& bullet_hole : bullet_holes) {
         glm::vec3 bullet_hole_up = glm::vec3(0.0f, 1.0f, 0.0f);
         if (std::abs(glm::dot(bullet_hole_up, bullet_hole.normal)) == 1.0f) {
             bullet_hole_up = glm::vec3(0.0f, 0.0f, 1.0f);
         }
         glm::mat4 model = glm::inverse(glm::lookAt(bullet_hole.position, bullet_hole.position - bullet_hole.normal, bullet_hole_up));
-        model = glm::scale(model, glm::vec3(0.1f));
         glUniformMatrix4fv(glGetUniformLocation(billboard_shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
         normal = glm::normalize(glm::vec3(1.0f, 0.0f, 0.0f));
         glUniform3fv(glGetUniformLocation(billboard_shader, "normal"), 1, glm::value_ptr(normal));
@@ -275,6 +276,7 @@ void scene_render() {
     }
 
     // prepare billboard shader for player gun
+    glUniform2iv(glGetUniformLocation(billboard_shader, "extents"), 1, glm::value_ptr(resource_extents[resource_player_pistol]));
     glm::mat4 unit_mat4 = glm::mat4(1.0f);
     glUniformMatrix4fv(glGetUniformLocation(billboard_shader, "projection"), 1, GL_FALSE, glm::value_ptr(unit_mat4));
     glUniformMatrix4fv(glGetUniformLocation(billboard_shader, "view"), 1, GL_FALSE, glm::value_ptr(unit_mat4));
