@@ -140,10 +140,10 @@ void Sector::init_buffers() {
 
     // ceiling
     raycast_add_plane({
-        .a = aabb[0],
-        .b = aabb[1],
-        .c = aabb[2],
-        .d = aabb[3],
+        .a = glm::vec3(aabb[0]),
+        .b = glm::vec3(aabb[1]),
+        .c = glm::vec3(aabb[2]),
+        .d = glm::vec3(aabb[3]),
         .normal = glm::vec3(0.0f, -1.0f, 0.0f)
     });
 

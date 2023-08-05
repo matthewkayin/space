@@ -1,6 +1,7 @@
 #include "raycast.hpp"
 
 #include <map>
+#include <cstdio>
 
 std::vector<RaycastPlane> raycast_planes;
 
@@ -21,8 +22,8 @@ RaycastResult raycast_cast(glm::vec3 origin, glm::vec3 direction, float range, u
             continue;
         }
 
-        float min_dist_from_origin = glm::dot(raycast_plane.normal, raycast_plane.a - origin);
-        float intersect_distance = (min_dist_from_origin - glm::dot(origin, raycast_plane.normal)) / glm::dot(direction, raycast_plane.normal);
+        float nd = glm::dot(raycast_plane.normal, raycast_plane.a);
+        float intersect_distance = (nd - glm::dot(origin, raycast_plane.normal)) / glm::dot(direction, raycast_plane.normal);
 
         // check that the plane is not "before" the ray origin
         if (intersect_distance < 0.0f) {
@@ -58,7 +59,8 @@ RaycastResult raycast_cast(glm::vec3 origin, glm::vec3 direction, float range, u
 
         return {
             .hit = true,
-            .point = intersect_point
+            .point = intersect_point,
+            .normal = raycast_plane.normal
         };
     }
 

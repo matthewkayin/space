@@ -14,6 +14,7 @@ struct RaycastPlane {
 struct RaycastResult {
     bool hit;
     glm::vec3 point;
+    glm::vec3 normal;
 };
 
 extern std::vector<RaycastPlane> raycast_planes;

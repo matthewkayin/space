@@ -1,7 +1,5 @@
 #pragma once
 
-#include "player.hpp"
-
 #include <glm/glm.hpp>
 #include <vector>
 
