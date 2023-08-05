@@ -17,6 +17,7 @@ enum Input {
     INPUT_DOWN,
     INPUT_YAW_ROLL,
     INPUT_FLASHLIGHT,
+    INPUT_RELOAD,
     INPUT_COUNT
 };
 

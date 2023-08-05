@@ -1,5 +1,6 @@
 #include "scene.hpp"
 
+#include "font.hpp"
 #include "globals.hpp"
 #include "resource.hpp"
 #include "level.hpp"
@@ -23,6 +24,7 @@ glm::ivec2 crosshair_sideways_extents = glm::ivec2(crosshair_extents.y, crosshai
 enum AnimationPistol {
     ANIMATION_PISTOL_IDLE,
     ANIMATION_PISTOL_FIRE,
+    ANIMATION_PISTOL_RELOAD,
     ANIMATION_COUNT
 };
 
@@ -49,7 +51,7 @@ struct Animation {
 
     void set_animation(unsigned int animation) {
         this->animation = animation;
-        frame = 0;
+        frame = animation_info[animation].start_frame;
         timer = 0.0f;
     }
 
@@ -83,6 +85,9 @@ glm::vec3 player_direction;
 glm::vec3 player_flashlight_direction;
 bool player_flashlight_on;
 Animation player_animation;
+unsigned int player_reserve_ammo = 9 * 6;
+unsigned int player_clip_ammo = 9;
+unsigned int player_clip_max = 9;
 
 std::vector<BulletHole> bullet_holes;
 
@@ -103,15 +108,21 @@ void scene_init() {
 
     player_animation.animation_info[ANIMATION_PISTOL_IDLE] = {
         .texture_array = resource_player_pistol,
-        .start_frame = 1,
-        .end_frame = 1,
+        .start_frame = 0,
+        .end_frame = 0,
         .frame_time = 0.0f,
     };
     player_animation.animation_info[ANIMATION_PISTOL_FIRE] = {
         .texture_array = resource_player_pistol,
-        .start_frame = 2,
+        .start_frame = 1,
         .end_frame = 4,
         .frame_time = 1.0f,
+    };
+    player_animation.animation_info[ANIMATION_PISTOL_RELOAD] = {
+        .texture_array = resource_player_pistol,
+        .start_frame = 5,
+        .end_frame = 30,
+        .frame_time = 1.0f
     };
 }
 
@@ -163,8 +174,9 @@ void scene_update(float delta) {
     }
 
     if (input.is_action_just_pressed[INPUT_LCLICK]) {
-        if (player_animation.animation == ANIMATION_PISTOL_IDLE || (player_animation.animation == ANIMATION_PISTOL_FIRE && player_animation.frame >= 2)) {
+        if (player_clip_ammo > 0 && (player_animation.animation == ANIMATION_PISTOL_IDLE || (player_animation.animation == ANIMATION_PISTOL_FIRE && player_animation.frame >= 2))) {
             player_animation.set_animation(ANIMATION_PISTOL_FIRE);
+            player_clip_ammo--;
 
             RaycastResult result = raycast_cast(player_position, -player_direction, 100.0f, 100);
             if (result.hit) {
@@ -175,11 +187,25 @@ void scene_update(float delta) {
             }
         }
     }
+    if (input.is_action_just_pressed[INPUT_RELOAD]) {
+        if (player_animation.animation == ANIMATION_PISTOL_IDLE && player_clip_ammo < player_clip_max && player_reserve_ammo > 0) {
+            player_animation.set_animation(ANIMATION_PISTOL_RELOAD);
+        }
+    }
+    if (player_animation.animation == ANIMATION_PISTOL_RELOAD && player_clip_ammo < player_clip_max && player_animation.frame >= 22) {
+        player_clip_ammo = std::min(player_clip_max, player_reserve_ammo);
+        player_reserve_ammo -= player_clip_ammo;
+    }
 
     // player animation
     player_animation.update(delta);
-    if (player_animation.animation == ANIMATION_PISTOL_FIRE && player_animation.is_finished) {
-        player_animation.set_animation(ANIMATION_PISTOL_IDLE);
+
+    if (player_animation.is_finished) {
+        if (player_animation.animation == ANIMATION_PISTOL_FIRE && player_clip_ammo == 0 && player_reserve_ammo > 0) {
+            player_animation.set_animation(ANIMATION_PISTOL_RELOAD);
+        } else {
+            player_animation.set_animation(ANIMATION_PISTOL_IDLE);
+        }
     }
 
     level_move_and_slide(&player_position, &player_velocity, delta);
@@ -271,4 +297,8 @@ void scene_render() {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
     glBindVertexArray(0);
+
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    std::string ammo_string = "AMMO: " + std::to_string(player_clip_ammo) + "/" + std::to_string(player_reserve_ammo);
+    font_hack_10pt.render_text(ammo_string, SCREEN_WIDTH - (ammo_string.length() * 10), 0.0f, glm::vec3(1.0f, 1.0f, 1.0f));
 }

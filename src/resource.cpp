@@ -74,7 +74,7 @@ bool resource_load_all() {
         .path = "./res/guns/pistol",
         .width = SCREEN_WIDTH,
         .height = SCREEN_HEIGHT,
-        .num_textures = 5,
+        .num_textures = 31,
         .format = GL_RGBA,
         .wrap_s = GL_CLAMP_TO_EDGE,
         .wrap_t = GL_CLAMP_TO_EDGE,
