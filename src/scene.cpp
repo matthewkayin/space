@@ -88,6 +88,8 @@ Animation player_animation;
 unsigned int player_reserve_ammo = 9 * 6;
 unsigned int player_clip_ammo = 9;
 unsigned int player_clip_max = 9;
+float player_recoil = 0.0f;
+float player_recoil_cooldown = 0.1f;
 
 std::vector<BulletHole> bullet_holes;
 
@@ -173,20 +175,40 @@ void scene_update(float delta) {
         player_velocity = glm::normalize(player_velocity) * PLAYER_MAX_VELOCITY;
     }
 
+    // shoot
     if (input.is_action_just_pressed[INPUT_LCLICK]) {
         if (player_clip_ammo > 0 && (player_animation.animation == ANIMATION_PISTOL_IDLE || (player_animation.animation == ANIMATION_PISTOL_FIRE && player_animation.frame >= 2))) {
             player_animation.set_animation(ANIMATION_PISTOL_FIRE);
-            player_clip_ammo--;
 
-            RaycastResult result = raycast_cast(player_position, -player_direction, 100.0f, 100);
+            glm::vec3 recoil = glm::vec3(0.0f, 0.0f, 0.0f);
+            if (player_recoil > 0.0f) {
+                float recoil_strength = (1 + (rand() % (int)(100 * player_recoil))) / 100.0f;
+                float drift_direction = 1.0f;
+                if (rand() % 2 == 0) {
+                    drift_direction = -1.0f;
+                }
+                recoil = ((glm::vec3(player_basis[0]) * drift_direction) + glm::vec3(player_basis[1])) * recoil_strength * 0.5f;
+            }
+            glm::vec3 player_fire_point = player_position - player_direction + recoil;
+            glm::vec3 fire_direction = glm::normalize(player_fire_point - player_position);
+
+            RaycastResult result = raycast_cast(player_position, fire_direction, 100.0f, 100);
             if (result.hit) {
                 bullet_holes.push_back({
                     .position = result.point + (result.normal * 0.05f),
                     .normal = result.normal
                 });
             }
+
+            player_clip_ammo--;
+            player_recoil = std::min(player_recoil + 0.4f, 1.0f);
         }
     }
+
+    // recoil cooldown
+    player_recoil = std::max(0.0f, player_recoil - (player_recoil_cooldown * delta));
+
+    // reload
     if (input.is_action_just_pressed[INPUT_RELOAD]) {
         if (player_animation.animation == ANIMATION_PISTOL_IDLE && player_clip_ammo < player_clip_max && player_reserve_ammo > 0) {
             player_animation.set_animation(ANIMATION_PISTOL_RELOAD);
@@ -276,7 +298,7 @@ void scene_render() {
     glBindVertexArray(quad_vao);
 
     // top part
-    glm::ivec2 crosshair_position = glm::ivec2(0, 8);
+    glm::ivec2 crosshair_position = glm::ivec2(0, 8 + (int)(16.0f * player_recoil));
     glUniform2iv(glGetUniformLocation(ui_shader, "position"), 1, glm::value_ptr(crosshair_position));
     glDrawArrays(GL_TRIANGLES, 0, 6);
 

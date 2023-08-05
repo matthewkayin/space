@@ -16,6 +16,7 @@
 #include <stb_image.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <ctime>
 
 #include <cstdio>
 #include <map>
@@ -38,6 +39,8 @@ unsigned int fps = 0;
 
 int main(int argc, char** argv) {
     edit_mode = argc > 1 && std::string(argv[1]) == "--edit";
+
+    srand(time(NULL));
 
     // Init engine
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
