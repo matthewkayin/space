@@ -35,6 +35,8 @@ uniform sampler2DArray u_texture_array;
 uniform uint frame;
 uniform uint flashlight_on;
 
+uniform uint flip_h;
+
 vec3 calculate_point_light(PointLight light, vec3 normal, vec3 frag_pos, vec3 view_direction);
 vec3 calculate_spot_light(SpotLight light, vec3 normal, vec3 frag_pos, vec3 view_direction);
 
@@ -51,7 +53,11 @@ void main() {
         light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);
     }
 
-    vec4 sampled = texture(u_texture_array, vec3(texture_coordinate.x, texture_coordinate.y, frame));
+    vec3 sample_coordinate = vec3(texture_coordinate.x, texture_coordinate.y, frame);
+    if (flip_h == 1) {
+        sample_coordinate.x = 1.0 - sample_coordinate.x;
+    }
+    vec4 sampled = texture(u_texture_array, sample_coordinate);
     frag_color = vec4(light_result, 1.0) * sampled;
 }
 

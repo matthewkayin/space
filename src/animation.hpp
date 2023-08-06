@@ -3,7 +3,6 @@
 #include <map>
 
 struct AnimationInfo {
-    unsigned int texture_array;
     unsigned int start_frame;
     unsigned int end_frame;
     float frame_time;

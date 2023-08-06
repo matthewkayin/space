@@ -24,6 +24,8 @@ const int TEXTURE_SIZE = 128;
 unsigned int resource_textures;
 unsigned int resource_player_pistol;
 unsigned int resource_bullet_hole;
+unsigned int resource_wasp;
+
 std::map<unsigned int, glm::ivec2> resource_extents;
 
 bool success = true;
@@ -96,6 +98,18 @@ bool resource_load_all() {
         .width = 32,
         .height = 32,
         .num_textures = 1,
+        .format = GL_RGBA,
+        .wrap_s = GL_CLAMP_TO_EDGE,
+        .wrap_t = GL_CLAMP_TO_EDGE,
+        .min_filter = GL_NEAREST_MIPMAP_LINEAR,
+        .mag_filter = GL_NEAREST_MIPMAP_LINEAR,
+        .generate_mipmaps = true
+    });
+    resource_load(&resource_wasp, {
+        .path = "./res/wasp",
+        .width = 181,
+        .height = 136,
+        .num_textures = 21,
         .format = GL_RGBA,
         .wrap_s = GL_CLAMP_TO_EDGE,
         .wrap_t = GL_CLAMP_TO_EDGE,

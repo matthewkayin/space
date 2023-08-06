@@ -1,5 +1,6 @@
 #include "scene.hpp"
 
+#include "enemy.hpp"
 #include "player.hpp"
 #include "globals.hpp"
 #include "resource.hpp"
@@ -17,6 +18,7 @@ struct BulletHole {
 };
 
 Player player;
+Enemy enemy;
 std::vector<BulletHole> bullet_holes;
 
 void scene_init() {
@@ -40,6 +42,8 @@ void scene_update(float delta) {
             .normal = player.raycast_result.normal
         });
     }
+
+    enemy.update(delta);
 }
 
 void scene_render() {
@@ -62,6 +66,7 @@ void scene_render() {
     glUniform3fv(glGetUniformLocation(billboard_shader, "player_flashlight.position"), 1, glm::value_ptr(player.position));
     glUniform3fv(glGetUniformLocation(billboard_shader, "player_flashlight.direction"), 1, glm::value_ptr(player.flashlight_direction));
     glUniform1ui(glGetUniformLocation(billboard_shader, "frame"), 0);
+    glUniform1ui(glGetUniformLocation(billboard_shader, "flip_h"), false);
 
     // bind quad vertex
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -82,6 +87,8 @@ void scene_render() {
         glUniform3fv(glGetUniformLocation(billboard_shader, "normal"), 1, glm::value_ptr(normal));
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
+
+    enemy.render(player.position);
 
     player.render();
 }

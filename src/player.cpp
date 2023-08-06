@@ -41,21 +41,16 @@ void Player::init() {
     reserve_ammo = 9 * 6;
 
     animation.add_animation(ANIMATION_PISTOL_IDLE, {
-        .texture_array = resource_player_pistol,
         .start_frame = 0,
         .end_frame = 0,
         .frame_time = 0.0f
     });
-
     animation.add_animation(ANIMATION_PISTOL_FIRE, {
-        .texture_array = resource_player_pistol,
         .start_frame = 1,
         .end_frame = 4,
         .frame_time = 1.0f
     });
-
     animation.add_animation(ANIMATION_PISTOL_RELOAD, {
-        .texture_array = resource_player_pistol,
         .start_frame = 5,
         .end_frame = 30,
         .frame_time = 1.0f
@@ -170,11 +165,12 @@ void Player::render() {
     glm::vec3 normal = glm::normalize(glm::vec3(basis[2]));
     glUniform3fv(glGetUniformLocation(billboard_shader, "normal"), 1, glm::value_ptr(normal));
     glUniform1ui(glGetUniformLocation(billboard_shader, "frame"), animation.frame);
+    glUniform1ui(glGetUniformLocation(billboard_shader, "flip_h"), false);
 
     // render gun
     glDisable(GL_DEPTH_TEST);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, animation.animation_info[animation.animation].texture_array);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, resource_player_pistol);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 
