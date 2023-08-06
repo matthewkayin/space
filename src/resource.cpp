@@ -43,7 +43,7 @@ void resource_load(unsigned int* id, ResourceLoadInput input) {
             success = false;
             return;
         }
-        if (width != input.width || height != input.height) {
+        if ((unsigned int)width != input.width || (unsigned int)height != input.height) {
             printf("width and height don't match texture %s\n", path.c_str());
             success = false;
             return;
