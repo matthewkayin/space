@@ -59,13 +59,29 @@ RaycastResult raycast_cast(glm::vec3 origin, glm::vec3 direction, float range, u
 
         return {
             .hit = true,
+            .plane = itr->second,
             .point = intersect_point,
-            .normal = raycast_plane.normal
         };
     }
 
     return {
         .hit = false,
+        .plane = 0,
         .point = glm::vec3(0.0f, 0.0f, 0.0f)
     };
 }
+
+float raycast_cast2d(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm::vec2 b_direction) {
+    glm::vec2 b_minus_a = b_origin - a_origin;
+    float a_direction_cross_b_direction = (a_direction.x * b_direction.y) - (a_direction.y * b_direction.x);
+
+    float a_time = ((b_minus_a.x * b_direction.y) - (b_minus_a.y * b_direction.x)) / a_direction_cross_b_direction;
+    float b_time = ((b_minus_a.x * a_direction.y) - (b_minus_a.y * a_direction.x)) / a_direction_cross_b_direction;
+
+    if (a_time < 0.0f || a_time > 1.0f || b_time < 0.0f || b_time > 1.0f) {
+        return -1.0f;
+    }
+
+    return a_time;
+}
+

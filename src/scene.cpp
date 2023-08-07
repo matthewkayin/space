@@ -12,14 +12,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-struct BulletHole {
-    glm::vec3 position;
-    glm::vec3 normal;
-};
-
 Player player;
-Enemy enemy;
-std::vector<BulletHole> bullet_holes;
+std::vector<Enemy> enemies;
+std::vector<EnemyBulletHole> enemy_bullet_holes;
 
 void scene_init() {
     glm::ivec2 screen_size = glm::ivec2(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -30,20 +25,143 @@ void scene_init() {
     glUseProgram(ui_shader);
     glUniform2iv(glGetUniformLocation(ui_shader, "screen_size"), 1, glm::value_ptr(screen_size));
 
+    Enemy enemy;
+    enemies.push_back(enemy);
+
     player.init();
 }
 
 void scene_update(float delta) {
     player.update(delta);
-    level_move_and_slide(&player.position, &player.velocity, delta);
+    scene_move_and_slide(&player.position, &player.velocity, delta);
     if (player.raycast_result.hit) {
-        bullet_holes.push_back({
-            .position = player.raycast_result.point + (player.raycast_result.normal * 0.05f),
-            .normal = player.raycast_result.normal
-        });
+        const RaycastPlane& plane = raycast_planes[player.raycast_result.plane];
+        if (plane.type == PLANE_TYPE_LEVEL) {
+            sectors[plane.id].bullet_holes.push_back({
+                .position = player.raycast_result.point + (plane.normal * 0.05f),
+                .normal = plane.normal
+            });
+        } else if (plane.type == PLANE_TYPE_ENEMY) {
+            enemy_bullet_holes.push_back(EnemyBulletHole(player.raycast_result.point + (plane.normal * 0.05f), plane.normal));
+        }
     }
 
-    enemy.update(delta);
+    for (Enemy& enemy : enemies) {
+        enemy.update(delta);
+    }
+
+    std::vector<unsigned int> finished_enemy_bullet_holes;
+    for (unsigned int i = 0; i < enemy_bullet_holes.size(); i++) {
+        enemy_bullet_holes[i].update(delta);
+        if (enemy_bullet_holes[i].animation.is_finished) {
+            finished_enemy_bullet_holes.push_back(i);
+        }
+    }
+    for (unsigned int index : finished_enemy_bullet_holes) {
+        enemy_bullet_holes.erase(enemy_bullet_holes.begin() + index);
+    }
+}
+
+void scene_move_and_slide(glm::vec3* position, glm::vec3* velocity, float delta) {
+    // check collisions and move player
+    if (glm::length(*velocity) == 0.0f) {
+        return;
+    }
+    glm::vec3 actual_velocity = *velocity * delta;
+
+    // check if within sector AABB
+    std::vector<Sector*> nearby_sectors;
+    for (unsigned int i = 0; i < sectors.size(); i++) {
+        Sector* sector = &sectors[i];
+        float padding = 1.0f;
+        if (position->x < sector->aabb_top_left.x - padding || position->x > sector->aabb_bot_right.x + padding ||
+            position->y < sector->floor_y || position->y > sector->ceiling_y ||
+            position->z < sector->aabb_top_left.y - padding || position->z > sector->aabb_bot_right.y + padding) {
+            continue;
+        }
+        nearby_sectors.push_back(sector);
+    }
+
+    // check floor / ceiling collisions
+    glm::vec2 origin2d = glm::vec2(position->x, position->z);
+    for (Sector* sector : nearby_sectors) {
+        glm::vec2 raycast_start = sector->aabb_top_left - glm::vec2(1.0f, 1.0f);
+        glm::vec2 raycast_direction = origin2d - raycast_start;
+        unsigned int hits = 0;
+        for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
+            float raycast_result = raycast_cast2d(raycast_start, raycast_direction, sector->vertices[wall], sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall]);
+            if (raycast_result != -1.0f) {
+                hits++;
+            }
+        }
+
+        if (hits % 2 == 0) {
+            continue;
+        }
+
+        float predicted_y = position->y + actual_velocity.y;
+        if (predicted_y + 0.5f >= sector->ceiling_y) {
+            glm::vec3 velocity_in_ceiling_normal_direction = glm::vec3(0.0f, -1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, -1.0f, 0.0f));
+            *velocity -= velocity_in_ceiling_normal_direction;
+            actual_velocity -= velocity_in_ceiling_normal_direction;
+        } else if (predicted_y - 0.5f <= sector->floor_y) {
+            glm::vec3 velocity_in_floor_normal_direction = glm::vec3(0.0f, 1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, 1.0f, 0.0f));
+            *velocity -= velocity_in_floor_normal_direction;
+            actual_velocity -= velocity_in_floor_normal_direction;
+        }
+    }
+
+    // check wall collisions
+    bool collided = true;
+    unsigned int attempts = 0;
+    while (collided && attempts < 10) {
+        collided = false;
+        attempts++;
+
+        for (Sector* sector : nearby_sectors) {
+            for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
+                if (!sector->walls[wall].exists) {
+                    continue;
+                }
+
+                glm::vec2 velocity2d = glm::vec2(actual_velocity.x, actual_velocity.z);
+                glm::vec2 predicted_origin2d = origin2d + velocity2d;
+
+                glm::vec2 wallv = sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall];
+                glm::vec2 f = sector->vertices[wall] - predicted_origin2d;
+                float a = glm::dot(wallv, wallv);
+                float b = 2 * glm::dot(f, wallv);
+                float c = glm::dot(f, f) - 0.25f;
+                float discriminant = (b * b) - (4.0f * a * c);
+
+                if (discriminant < 0.0f) {
+                    continue;
+                }
+
+                discriminant = sqrt(discriminant);
+                float t1 = (-b - discriminant) / (2.0f * a);
+                float t2 = (-b + discriminant) / (2.0f * a);
+
+                if (!(t1 >= 0.0f && t1 <= 1.0f) && !(t2 >= 0.0f && t2 <= 1.0f)) {
+                    continue;
+                }
+
+                glm::vec3 velocity_in_wall_normal_direction = sector->walls[wall].normal * glm::dot(actual_velocity, sector->walls[wall].normal);
+                *velocity -= velocity_in_wall_normal_direction;
+                actual_velocity = actual_velocity - velocity_in_wall_normal_direction;
+                collided = true;
+            }
+        }
+        /*for (Enemy& enemy : enemies) {
+            if (position->y)
+        }*/
+    }
+
+    if (attempts == 5) {
+        actual_velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+    }
+
+    *position += actual_velocity;
 }
 
 void scene_render() {
@@ -53,42 +171,27 @@ void scene_render() {
     glm::mat4 projection;
     projection = glm::perspective(glm::radians(45.0f), static_cast<float>(SCREEN_WIDTH) / static_cast<float>(SCREEN_HEIGHT), 0.1f, 100.0f);
 
-    level_render(view, projection, player.position, player.flashlight_direction, player.flashlight_on);
-
     // prepare billboard shader
     glUseProgram(billboard_shader);
     glUniformMatrix4fv(glGetUniformLocation(billboard_shader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUniformMatrix4fv(glGetUniformLocation(billboard_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));
     glUniform1ui(glGetUniformLocation(billboard_shader, "flashlight_on"), player.flashlight_on);
     glUniform3fv(glGetUniformLocation(billboard_shader, "view_pos"), 1, glm::value_ptr(player.position));
-    glm::vec3 normal = glm::normalize(glm::vec3(0.0f, 0.0f, 1.0f));
-    glUniform3fv(glGetUniformLocation(billboard_shader, "normal"), 1, glm::value_ptr(normal));
     glUniform3fv(glGetUniformLocation(billboard_shader, "player_flashlight.position"), 1, glm::value_ptr(player.position));
     glUniform3fv(glGetUniformLocation(billboard_shader, "player_flashlight.direction"), 1, glm::value_ptr(player.flashlight_direction));
     glUniform1ui(glGetUniformLocation(billboard_shader, "frame"), 0);
     glUniform1ui(glGetUniformLocation(billboard_shader, "flip_h"), false);
 
+    level_render(view, projection, player.position, player.flashlight_direction, player.flashlight_on);
+
     // bind quad vertex
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, resource_bullet_hole);
-    glBindVertexArray(quad_vao);
 
-    // render bullet holes
-    glUniform2iv(glGetUniformLocation(billboard_shader, "extents"), 1, glm::value_ptr(resource_extents[resource_bullet_hole]));
-    for (const BulletHole& bullet_hole : bullet_holes) {
-        glm::vec3 bullet_hole_up = glm::vec3(0.0f, 1.0f, 0.0f);
-        if (std::abs(glm::dot(bullet_hole_up, bullet_hole.normal)) == 1.0f) {
-            bullet_hole_up = glm::vec3(0.0f, 0.0f, 1.0f);
-        }
-        glm::mat4 model = glm::inverse(glm::lookAt(bullet_hole.position, bullet_hole.position - bullet_hole.normal, bullet_hole_up));
-        glUniformMatrix4fv(glGetUniformLocation(billboard_shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        normal = glm::normalize(glm::vec3(1.0f, 0.0f, 0.0f));
-        glUniform3fv(glGetUniformLocation(billboard_shader, "normal"), 1, glm::value_ptr(normal));
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+    for (Enemy& enemy : enemies) {
+        enemy.render(player.position);
     }
-
-    enemy.render(player.position);
+    for (EnemyBulletHole& enemy_bullet_hole : enemy_bullet_holes) {
+        enemy_bullet_hole.render();
+    }
 
     player.render();
 }

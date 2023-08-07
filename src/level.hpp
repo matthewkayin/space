@@ -24,6 +24,11 @@ struct PointLight {
     float quadratic;
 };
 
+struct LevelBulletHole {
+    glm::vec3 position;
+    glm::vec3 normal;
+};
+
 struct Sector {
     std::vector<glm::vec2> vertices;
     float floor_y;
@@ -40,10 +45,12 @@ struct Sector {
     unsigned int vao, vbo;
     unsigned int vertex_data_size;
 
+    std::vector<LevelBulletHole> bullet_holes;
+
     Sector();
     ~Sector();
     void add_vertex(const glm::vec2 vertex, unsigned int texture_index, bool wall_exists);
-    void init_buffers();
+    void init_buffers(unsigned int index);
     void render();
 };
 

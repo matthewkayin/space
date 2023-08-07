@@ -21,20 +21,6 @@ float camera_pitch = 0.0f;
 glm::vec3 camera_direction = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 camera_position = glm::vec3(0.0f, 0.5f, 0.0f);
 
-float raycast(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm::vec2 b_direction) {
-    glm::vec2 b_minus_a = b_origin - a_origin;
-    float a_direction_cross_b_direction = (a_direction.x * b_direction.y) - (a_direction.y * b_direction.x);
-
-    float a_time = ((b_minus_a.x * b_direction.y) - (b_minus_a.y * b_direction.x)) / a_direction_cross_b_direction;
-    float b_time = ((b_minus_a.x * a_direction.y) - (b_minus_a.y * a_direction.x)) / a_direction_cross_b_direction;
-
-    if (a_time < 0.0f || a_time > 1.0f || b_time < 0.0f || b_time > 1.0f) {
-        return -1.0f;
-    }
-
-    return a_time;
-}
-
 Sector::Sector() {
     has_generated_buffers = false;
     floor_y = 0.0f;
@@ -57,7 +43,7 @@ void Sector::add_vertex(const glm::vec2 vertex, unsigned int texture_index, bool
     });
 }
 
-void Sector::init_buffers() {
+void Sector::init_buffers(unsigned int index) {
     std::vector<VertexData> vertex_data;
 
     // walls
@@ -112,6 +98,8 @@ void Sector::init_buffers() {
         }
 
         raycast_add_plane({
+            .type = PLANE_TYPE_LEVEL,
+            .id = index,
             .a = wall_top_left,
             .b = wall_top_right,
             .c = wall_bot_right,
@@ -140,6 +128,8 @@ void Sector::init_buffers() {
 
     // ceiling
     raycast_add_plane({
+        .type = PLANE_TYPE_LEVEL,
+        .id = index,
         .a = glm::vec3(aabb[0]),
         .b = glm::vec3(aabb[1]),
         .c = glm::vec3(aabb[2]),
@@ -149,6 +139,8 @@ void Sector::init_buffers() {
 
     // floor
     raycast_add_plane({
+        .type = PLANE_TYPE_LEVEL,
+        .id = index,
         .a = aabb[4],
         .b = aabb[5],
         .c = aabb[6],
@@ -279,9 +271,34 @@ void Sector::init_buffers() {
 }
 
 void Sector::render() {
+    // render level geometry
+    glUseProgram(texture_shader);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, resource_textures);
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, vertex_data_size);
     glBindVertexArray(0);
+
+    // bind quad vertex
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, resource_bullet_hole);
+    glBindVertexArray(quad_vao);
+
+    // render bullet holes
+    glUseProgram(billboard_shader);
+    glUniform1ui(glGetUniformLocation(billboard_shader, "frame"), 0);
+    glUniform2iv(glGetUniformLocation(billboard_shader, "extents"), 1, glm::value_ptr(resource_extents[resource_bullet_hole]));
+    for (const LevelBulletHole& bullet_hole : bullet_holes) {
+        glm::vec3 bullet_hole_up = glm::vec3(0.0f, 1.0f, 0.0f);
+        if (std::abs(glm::dot(bullet_hole_up, bullet_hole.normal)) == 1.0f) {
+            bullet_hole_up = glm::vec3(0.0f, 0.0f, 1.0f);
+        }
+        glm::mat4 model = glm::inverse(glm::lookAt(bullet_hole.position, bullet_hole.position - bullet_hole.normal, bullet_hole_up));
+        glUniformMatrix4fv(glGetUniformLocation(billboard_shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
+        glUniform3fv(glGetUniformLocation(billboard_shader, "normal"), 1, glm::value_ptr(bullet_hole.normal));
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    }
 }
 
 Frustum::Frustum(const glm::mat4& projection_view_transpose) {
@@ -378,107 +395,8 @@ void level_init() {
 void level_init_sectors() {
     raycast_planes.clear();
     for (unsigned int i = 0; i < sectors.size(); i++) {
-        sectors[i].init_buffers();
+        sectors[i].init_buffers(i);
     }
-}
-
-void level_move_and_slide(glm::vec3* position, glm::vec3* velocity, float delta) {
-    // check collisions and move player
-    if (glm::length(*velocity) == 0.0f) {
-        return;
-    }
-    glm::vec3 actual_velocity = *velocity * delta;
-
-    // check if within sector AABB
-    std::vector<Sector*> nearby_sectors;
-    for (unsigned int i = 0; i < sectors.size(); i++) {
-        Sector* sector = &sectors[i];
-        float padding = 1.0f;
-        if (position->x < sector->aabb_top_left.x - padding || position->x > sector->aabb_bot_right.x + padding ||
-            position->y < sector->floor_y || position->y > sector->ceiling_y ||
-            position->z < sector->aabb_top_left.y - padding || position->z > sector->aabb_bot_right.y + padding) {
-            continue;
-        }
-        nearby_sectors.push_back(sector);
-    }
-
-    // check floor / ceiling collisions
-    glm::vec2 origin2d = glm::vec2(position->x, position->z);
-    for (Sector* sector : nearby_sectors) {
-        glm::vec2 raycast_start = sector->aabb_top_left - glm::vec2(1.0f, 1.0f);
-        glm::vec2 raycast_direction = origin2d - raycast_start;
-        unsigned int hits = 0;
-        for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
-            float raycast_result = raycast(raycast_start, raycast_direction, sector->vertices[wall], sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall]);
-            if (raycast_result != -1.0f) {
-                hits++;
-            }
-        }
-
-        if (hits % 2 == 0) {
-            continue;
-        }
-
-        float predicted_y = position->y + actual_velocity.y;
-        if (predicted_y + 0.5f >= sector->ceiling_y) {
-            glm::vec3 velocity_in_ceiling_normal_direction = glm::vec3(0.0f, -1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, -1.0f, 0.0f));
-            *velocity -= velocity_in_ceiling_normal_direction;
-            actual_velocity -= velocity_in_ceiling_normal_direction;
-        } else if (predicted_y - 0.5f <= sector->floor_y) {
-            glm::vec3 velocity_in_floor_normal_direction = glm::vec3(0.0f, 1.0f, 0.0f) * glm::dot(actual_velocity, glm::vec3(0.0f, 1.0f, 0.0f));
-            *velocity -= velocity_in_floor_normal_direction;
-            actual_velocity -= velocity_in_floor_normal_direction;
-        }
-    }
-
-    // check wall collisions
-    bool collided = true;
-    unsigned int attempts = 0;
-    while (collided && attempts < 10) {
-        collided = false;
-        attempts++;
-
-        for (Sector* sector : nearby_sectors) {
-            for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
-                if (!sector->walls[wall].exists) {
-                    continue;
-                }
-
-                glm::vec2 velocity2d = glm::vec2(actual_velocity.x, actual_velocity.z);
-                glm::vec2 predicted_origin2d = origin2d + velocity2d;
-
-                glm::vec2 wallv = sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall];
-                glm::vec2 f = sector->vertices[wall] - predicted_origin2d;
-                float a = glm::dot(wallv, wallv);
-                float b = 2 * glm::dot(f, wallv);
-                float c = glm::dot(f, f) - 0.25f;
-                float discriminant = (b * b) - (4.0f * a * c);
-
-                if (discriminant < 0.0f) {
-                    continue;
-                }
-
-                discriminant = sqrt(discriminant);
-                float t1 = (-b - discriminant) / (2.0f * a);
-                float t2 = (-b + discriminant) / (2.0f * a);
-
-                if (!(t1 >= 0.0f && t1 <= 1.0f) && !(t2 >= 0.0f && t2 <= 1.0f)) {
-                    continue;
-                }
-
-                glm::vec3 velocity_in_wall_normal_direction = sector->walls[wall].normal * glm::dot(actual_velocity, sector->walls[wall].normal);
-                *velocity -= velocity_in_wall_normal_direction;
-                actual_velocity = actual_velocity - velocity_in_wall_normal_direction;
-                collided = true;
-            }
-        }
-    }
-
-    if (attempts == 5) {
-        actual_velocity = glm::vec3(0.0f, 0.0f, 0.0f);
-    }
-
-    *position += actual_velocity;
 }
 
 void level_edit_update(float delta) {

@@ -25,6 +25,7 @@ unsigned int resource_textures;
 unsigned int resource_player_pistol;
 unsigned int resource_bullet_hole;
 unsigned int resource_wasp;
+unsigned int resource_wasp_bullet_hole;
 
 std::map<unsigned int, glm::ivec2> resource_extents;
 
@@ -95,9 +96,21 @@ bool resource_load_all() {
     });
     resource_load(&resource_bullet_hole, {
         .path = "./res/bullet_hole",
-        .width = 32,
-        .height = 32,
+        .width = 16,
+        .height = 16,
         .num_textures = 1,
+        .format = GL_RGBA,
+        .wrap_s = GL_CLAMP_TO_EDGE,
+        .wrap_t = GL_CLAMP_TO_EDGE,
+        .min_filter = GL_NEAREST_MIPMAP_LINEAR,
+        .mag_filter = GL_NEAREST_MIPMAP_LINEAR,
+        .generate_mipmaps = true
+    });
+    resource_load(&resource_wasp_bullet_hole, {
+        .path = "./res/alien_bullet_hole",
+        .width = 16,
+        .height = 16,
+        .num_textures = 3,
         .format = GL_RGBA,
         .wrap_s = GL_CLAMP_TO_EDGE,
         .wrap_t = GL_CLAMP_TO_EDGE,
