@@ -11,11 +11,15 @@ unsigned int raycast_add_plane(RaycastPlane plane) {
     return raycast_planes.size() - 1;
 }
 
-RaycastResult raycast_cast(glm::vec3 origin, glm::vec3 direction, float range, unsigned int ignore) {
+RaycastResult raycast_cast(glm::vec3 origin, glm::vec3 direction, float range, bool ignore_enemies) {
     // using multimap so that intersect distances are sorted in order of shortest to furthest distance
     std::multimap<float, unsigned int> intersect_distances;
     for (unsigned int plane = 0; plane < raycast_planes.size(); plane++) {
         const RaycastPlane& raycast_plane = raycast_planes[plane];
+
+        if (ignore_enemies && raycast_plane.type == PLANE_TYPE_ENEMY) {
+            continue;
+        }
 
         // if normal and direction are perpendicular, then ray is parallel to plane
         if (glm::dot(direction, raycast_plane.normal) == 0.0f) {

@@ -1,5 +1,6 @@
 #include "player.hpp"
 
+#include "level.hpp"
 #include "input.hpp"
 #include "resource.hpp"
 #include "shader.hpp"
@@ -26,7 +27,7 @@ glm::ivec2 crosshair_extents = glm::ivec2(1, 3);
 glm::ivec2 crosshair_sideways_extents = glm::ivec2(crosshair_extents.y, crosshair_extents.x);
 
 void Player::init() {
-    position = glm::vec3(0.0f, 1.0f, 0.0f);
+    position = player_spawn_point;
     velocity = glm::vec3(0.0f, 0.0f, 0.0f);
     basis = glm::mat4(1.0f);
     direction = -glm::vec3(basis[2]);
@@ -123,7 +124,7 @@ void Player::update(float delta) {
             glm::vec3 fire_point = position + direction + recoil_offset;
             glm::vec3 fire_direction = glm::normalize(fire_point - position);
 
-            raycast_result = raycast_cast(position, fire_direction, 100.0f, 100);
+            raycast_result = raycast_cast(position, fire_direction, 100.0f, false);
 
             clip_ammo--;
             recoil = std::min(recoil + 0.4f, 1.0f);

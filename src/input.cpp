@@ -23,6 +23,7 @@ void input_set_mapping() {
     input_map.insert({ SDLK_DELETE, INPUT_DELETE });
     input_map.insert({ SDLK_t, INPUT_T });
     input_map.insert({ SDLK_g, INPUT_G });
+    input_map.insert({ SDLK_o, INPUT_O });
     input_map.insert({ SDLK_r, INPUT_RELOAD });
 }
 

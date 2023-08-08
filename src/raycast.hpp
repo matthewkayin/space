@@ -27,5 +27,5 @@ struct RaycastResult {
 extern std::vector<RaycastPlane> raycast_planes;
 
 unsigned int raycast_add_plane(RaycastPlane plane);
-RaycastResult raycast_cast(glm::vec3 origin, glm::vec3 direction, float range, unsigned int ignore);
+RaycastResult raycast_cast(glm::vec3 origin, glm::vec3 direction, float range, bool ignore_enemies);
 float raycast_cast2d(glm::vec2 a_origin, glm::vec2 a_direction, glm::vec2 b_origin, glm::vec2 b_direction);

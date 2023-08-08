@@ -9,6 +9,7 @@ enum Input {
     INPUT_DELETE,
     INPUT_T,
     INPUT_G,
+    INPUT_O,
     INPUT_FORWARD,
     INPUT_BACKWARD,
     INPUT_RIGHT,

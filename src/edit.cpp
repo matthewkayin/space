@@ -15,7 +15,19 @@
 enum Mode {
     MODE_SECTOR,
     MODE_VERTEX,
-    MODE_NEW_SECTOR
+    MODE_NEW_SECTOR,
+    MODE_OBJECT,
+    MODE_NEW_OBJECT
+};
+
+enum ObjectType {
+    OBJECT_PLAYER,
+    OBJECT_ENEMY
+};
+
+struct ObjectSelection {
+    ObjectType type;
+    unsigned int index;
 };
 
 SDL_Window* edit_window;
@@ -32,7 +44,6 @@ const SDL_Color selected_vertex_color = { .r = 255, .g = 255, .b = 0, .a = 255 }
 const SDL_Color selected_wall_color = { .r = 130, .g = 130, .b = 0, .a = 255 };
 const SDL_Color selected_hidden_wall_color = { .r = 80, .g = 80, .b = 0, .a = 255 };
 const SDL_Color vertex_cursor_color = { .r = 255, .g = 255, .b = 255, .a = 128 };
-
 
 const unsigned int UI_WIDTH = 128;
 SDL_Rect ui_rect = {
@@ -56,6 +67,7 @@ glm::ivec2 camera_offset = glm::ivec2(viewport_width / 2, viewport_height / 2);
 
 Mode mode = MODE_SECTOR;
 std::vector<unsigned int> selected_sectors;
+std::vector<ObjectSelection> object_selections;
 
 bool dragging = false;
 int dragging_vertex = -1;
@@ -67,6 +79,7 @@ std::vector<SDL_Rect> ui_hover_box;
 int ui_hover_index = -1;
 
 Sector new_sector;
+ObjectType new_object_type;
 
 unsigned int current_texture = 0;
 
@@ -76,12 +89,15 @@ bool is_mouse_in_rect(SDL_Rect& r) {
 
 void refresh_ui_boxes() {
     ui_hover_box.clear();
-    if (mode == MODE_SECTOR || mode == MODE_VERTEX) {
+    if (mode == MODE_SECTOR || mode == MODE_VERTEX || mode == MODE_OBJECT) {
         int lines_of_text = 5;
         unsigned int num_boxes = selected_sectors.size();
         if (mode == MODE_VERTEX) {
             lines_of_text = 3;
             num_boxes = sectors[selected_sectors[0]].vertices.size();
+        } else if (mode == MODE_OBJECT) {
+            lines_of_text = 2;
+            num_boxes = object_selections.size();
         }
         for (unsigned int i = 0; i < num_boxes; i++) {
             ui_hover_box.push_back({
@@ -215,6 +231,51 @@ void edit_update() {
                 refresh_ui_boxes();
             } else if (mode == MODE_NEW_SECTOR) {
                 new_sector.add_vertex(glm::vec2(mouse_snapped_position) / 8.0f, current_texture, true);
+            } else if (mode == MODE_OBJECT) {
+                if (!input.is_action_pressed[INPUT_CTRL]) {
+                    object_selections.clear();
+                }
+                SDL_Rect p = {
+                    .x = (4 * ((int)(player_spawn_point.x * 8.0f) + camera_offset.x) - 2),
+                    .y = (4 * ((int)(player_spawn_point.z * 8.0f) + camera_offset.y) - 2),
+                    .w = 8,
+                    .h = 8
+                };
+
+                if (is_mouse_in_rect(p)) {
+                    object_selections.push_back({
+                        .type = OBJECT_PLAYER,
+                        .index = 0
+                    });
+                }
+
+                for (unsigned int i = 0; i < enemy_spawn_points.size(); i++) {
+                    p = {
+                        .x = (4 * ((int)(enemy_spawn_points[i].x * 8.0f) + camera_offset.x) - 2),
+                        .y = (4 * ((int)(enemy_spawn_points[i].z * 8.0f) + camera_offset.y) - 2),
+                        .w = 8,
+                        .h = 8
+                    };
+
+                    if (is_mouse_in_rect(p)) {
+                        object_selections.push_back({
+                            .type = OBJECT_ENEMY,
+                            .index = i
+                        });
+                    }
+                }
+
+                refresh_ui_boxes();
+            } else if (mode == MODE_NEW_OBJECT) {
+                if (new_object_type == OBJECT_ENEMY) {
+                    enemy_spawn_points.push_back(glm::vec3(mouse_snapped_position.x, 0.0f, mouse_snapped_position.y) / 8.0f);
+                    mode = MODE_OBJECT;
+                    object_selections.push_back({
+                        .type = OBJECT_ENEMY,
+                        .index = (unsigned int)(enemy_spawn_points.size() - 1)
+                    });
+                    refresh_ui_boxes();
+                }
             }
         }
 
@@ -257,12 +318,19 @@ void edit_update() {
                 }
             } else if (mode == MODE_VERTEX && dragging_vertex != -1) {
                 sectors[selected_sectors[0]].vertices[dragging_vertex] += drag_movement;
+            } else if (mode == MODE_OBJECT) {
+                for (ObjectSelection& object_selection : object_selections) {
+                    if (object_selection.type == OBJECT_PLAYER) {
+                        player_spawn_point += glm::vec3(drag_movement.x, 0.0f, drag_movement.y);
+                    }
+                }
             }
         }
 
         // exit current mode
         if (input.is_action_just_pressed[INPUT_DOWN] && (mode == MODE_NEW_SECTOR || mode == MODE_VERTEX)) {
             mode = MODE_SECTOR;
+            refresh_ui_boxes();
         }
 
         // begin sector create
@@ -281,6 +349,60 @@ void edit_update() {
             level_init_sectors();
             refresh_ui_boxes();
         }
+
+        // cancel new sector mode
+        if (mode == MODE_NEW_SECTOR && input.is_action_just_pressed[INPUT_DOWN]) {
+            mode = MODE_SECTOR;
+            refresh_ui_boxes();
+        }
+
+        // enter object mode
+        if (mode == MODE_SECTOR && !dragging && input.is_action_just_pressed[INPUT_O]) {
+            mode = MODE_OBJECT;
+            selected_sectors.clear();
+            refresh_ui_boxes();
+        }
+
+        // enter sector mode
+        if (mode == MODE_OBJECT && !dragging && input.is_action_just_pressed[INPUT_BACKWARD]) {
+            mode = MODE_SECTOR;
+            object_selections.clear();
+            refresh_ui_boxes();
+        }
+
+        // enter new object mode
+        if (mode == MODE_OBJECT && !dragging && input.is_action_just_pressed[INPUT_LEFT]) {
+            mode = MODE_NEW_OBJECT;
+            new_object_type = OBJECT_ENEMY;
+            object_selections.clear();
+            refresh_ui_boxes();
+        }
+
+        // cancel new object mode
+        if (mode == MODE_NEW_OBJECT && input.is_action_just_pressed[INPUT_DOWN]) {
+            mode = MODE_OBJECT;
+            refresh_ui_boxes();
+        }
+
+        // deselect object
+        if (mode == MODE_OBJECT && input.is_action_just_pressed[INPUT_RCLICK] && ui_hover_index != -1) {
+            object_selections.erase(object_selections.begin() + ui_hover_index);
+            refresh_ui_boxes();
+        }
+
+        // delete object
+        if (mode == MODE_OBJECT && input.is_action_just_pressed[INPUT_DELETE] && ui_hover_index != -1) {
+            if (object_selections[ui_hover_index].type == OBJECT_ENEMY) {
+                enemy_spawn_points.erase(enemy_spawn_points.begin() + object_selections[ui_hover_index].index);
+                object_selections.erase(object_selections.begin() + ui_hover_index);
+            }
+            refresh_ui_boxes();
+        }
+
+        // save file
+        if (mode != MODE_NEW_OBJECT && mode != MODE_NEW_SECTOR && !dragging && input.is_action_just_pressed[INPUT_FLASHLIGHT]) {
+            level_save_file();
+        }
     // mouse is inside ui rect
     } else {
         for (unsigned int i = 0; i < ui_hover_box.size(); i++) {
@@ -291,11 +413,9 @@ void edit_update() {
         }
 
         // deselect sector
-        if (input.is_action_just_pressed[INPUT_RCLICK] && ui_hover_index != -1) {
-            if (mode == MODE_SECTOR) {
-                selected_sectors.erase(selected_sectors.begin() + ui_hover_index);
-                refresh_ui_boxes();
-            }
+        if (mode == MODE_SECTOR && input.is_action_just_pressed[INPUT_RCLICK] && ui_hover_index != -1) {
+            selected_sectors.erase(selected_sectors.begin() + ui_hover_index);
+            refresh_ui_boxes();
         }
 
         // go into vertex mode for sector
@@ -374,6 +494,15 @@ void edit_update() {
             sectors[ui_hover_index].floor_texture_index = current_texture;
             level_init_sectors();
         }
+
+        // begin changing object y
+        if (mode == MODE_OBJECT && ui_hover_index != -1 && input.is_action_pressed[INPUT_UP]) {
+            if (object_selections[ui_hover_index].type == OBJECT_PLAYER) {
+                player_spawn_point.y -= input.mouse_raw_yrel * 0.5f;
+            } else if (object_selections[ui_hover_index].type == OBJECT_ENEMY) {
+                enemy_spawn_points[object_selections[ui_hover_index].index].y -= input.mouse_raw_yrel * 0.5f;
+            }
+        }
     }
 }
 
@@ -425,7 +554,7 @@ void edit_render() {
         }
     }
 
-    if (mode == MODE_NEW_SECTOR) {
+    if (mode == MODE_NEW_SECTOR || mode == MODE_NEW_OBJECT) {
         SDL_SetRenderDrawColor(renderer, vertex_cursor_color.r, vertex_cursor_color.g, vertex_cursor_color.b, vertex_cursor_color.a);
         glm::ivec2 mouse_snapped_position = glm::ivec2(input.mouse_raw_x / 4, input.mouse_raw_y / 4) - camera_offset;
         SDL_Rect v = {
@@ -435,7 +564,44 @@ void edit_render() {
             .h = 1
         };
         SDL_RenderDrawRect(renderer, &v);
+    }
+    if (mode == MODE_NEW_SECTOR) {
         edit_render_sector_vertices(new_sector, vertex_color);
+    }
+
+    // Render player spawn
+    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    for (ObjectSelection& object_selection : object_selections) {
+        if (object_selection.type == OBJECT_PLAYER) {
+            SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+            break;
+        }
+    }
+    SDL_Rect p = {
+        .x = (int)(player_spawn_point.x * 8.0f) + camera_offset.x,
+        .y = (int)(player_spawn_point.z * 8.0f) + camera_offset.y,
+        .w = 1,
+        .h = 1
+    };
+    SDL_RenderDrawRect(renderer, &p);
+
+    // Render enemy spawns
+    for (unsigned int i = 0; i < enemy_spawn_points.size(); i++) {
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        for (ObjectSelection& object_selection : object_selections) {
+            if (object_selection.type == OBJECT_ENEMY && object_selection.index == i) {
+                SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+                break;
+            }
+        }
+
+        p = {
+            .x = (int)(enemy_spawn_points[i].x * 8.0f) + camera_offset.x,
+            .y = (int)(enemy_spawn_points[i].z * 8.0f) + camera_offset.y,
+            .w = 1,
+            .h = 1
+        };
+        SDL_RenderDrawRect(renderer, &p);
     }
 
     // Render UI
@@ -471,6 +637,22 @@ void edit_render() {
         }
     } else if (mode == MODE_NEW_SECTOR) {
         edit_render_ui_text("New Sector Mode");
+    } else if (mode == MODE_OBJECT) {
+        edit_render_ui_text("Object Mode");
+        for (ObjectSelection& object_selection : object_selections) {
+            if (object_selection.type == OBJECT_PLAYER) {
+                edit_render_ui_text("Player");
+                edit_render_ui_text("y: " + std::to_string(player_spawn_point.y));
+            } else if (object_selection.type == OBJECT_ENEMY) {
+                edit_render_ui_text("Enemy " + std::to_string(object_selection.index));
+                edit_render_ui_text("y: " + std::to_string(enemy_spawn_points[object_selection.index].y));
+            }
+        }
+    } else if (mode == MODE_NEW_OBJECT) {
+        edit_render_ui_text("New Object Mode");
+        if (new_object_type == OBJECT_ENEMY) {
+            edit_render_ui_text("Type: Enemy");
+        }
     }
 
     // render texture

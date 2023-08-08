@@ -25,8 +25,11 @@ void scene_init() {
     glUseProgram(ui_shader);
     glUniform2iv(glGetUniformLocation(ui_shader, "screen_size"), 1, glm::value_ptr(screen_size));
 
-    Enemy enemy;
-    enemies.push_back(enemy);
+    for (glm::vec3 enemy_spawn_point : enemy_spawn_points) {
+        Enemy enemy;
+        enemy.position = enemy_spawn_point;
+        enemies.push_back(enemy);
+    }
 
     player.init();
 }
@@ -49,7 +52,7 @@ void scene_update(float delta) {
 
     std::vector<unsigned int> indices_to_remove;
     for (unsigned int i = 0; i < enemies.size(); i++) {
-        enemies[i].update(delta);
+        enemies[i].update(player.position, delta);
         if (enemies[i].is_dead) {
             indices_to_remove.push_back(i);
         }
@@ -210,7 +213,7 @@ void scene_render() {
     // bind quad vertex
 
     for (Enemy& enemy : enemies) {
-        enemy.render(player.position);
+        enemy.render();
     }
     for (EnemyBulletHole& enemy_bullet_hole : enemy_bullet_holes) {
         enemy_bullet_hole.render();

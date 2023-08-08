@@ -18,6 +18,8 @@ struct EnemyBulletHole {
 struct Enemy {
     glm::vec3 position;
     glm::vec3 direction;
+    glm::vec3 facing_direction;
+    float angle;
 
     glm::vec2 hurtbox_extents;
     unsigned int hurtbox_raycast_plane;
@@ -30,7 +32,7 @@ struct Enemy {
     bool is_dead;
 
     Enemy();
-    void update(float delta);
+    void update(glm::vec3 player_position, float delta);
     void take_damage(int amount);
-    void render(glm::vec3 player_position);
+    void render();
 };

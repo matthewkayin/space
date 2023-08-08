@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <vector>
+#include <string>
 
 struct VertexData {
     glm::vec3 position;
@@ -62,9 +63,11 @@ struct Frustum {
 
 extern std::vector<Sector> sectors;
 extern std::vector<PointLight> lights;
+extern glm::vec3 player_spawn_point;
+extern std::vector<glm::vec3> enemy_spawn_points;
 
-void level_init();
+void level_save_file();
+void level_init(std::string path);
 void level_init_sectors();
 void level_move_and_slide(glm::vec3* position, glm::vec3* velocity, float delta);
-void level_edit_update(float delta);
 void level_render(glm::mat4 view, glm::mat4 projection, glm::vec3 view_pos, glm::vec3 flashlight_direction, bool flashlight_on);

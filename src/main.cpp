@@ -2,6 +2,7 @@
     #define SDL_MAIN_HANDLED
 #endif
 
+#include "edit_scene.hpp"
 #include "edit.hpp"
 #include "input.hpp"
 #include "level.hpp"
@@ -28,8 +29,8 @@ unsigned int quad_vao;
 SDL_Window* window;
 SDL_GLContext context;
 
-unsigned int WINDOW_WIDTH = 1280;
-unsigned int WINDOW_HEIGHT = 720;
+unsigned int WINDOW_WIDTH = 640;
+unsigned int WINDOW_HEIGHT = 360;
 
 const unsigned long FRAME_TIME = 1000.0 / 60.0;
 unsigned long last_time = SDL_GetTicks();
@@ -38,7 +39,16 @@ unsigned int frames = 0;
 unsigned int fps = 0;
 
 int main(int argc, char** argv) {
-    edit_mode = argc > 1 && std::string(argv[1]) == "--edit";
+    edit_mode = false;
+    std::string level_path = "";
+    for (unsigned int i = 0; i < argc; i++) {
+        std::string arg = std::string(argv[i]);
+        if (arg == "--edit") {
+            edit_mode = true;
+        } else if (arg.find("--level") != std::string::npos) {
+            level_path = arg.substr(arg.find("=") + 1);
+        }
+    }
 
     srand(time(NULL));
 
@@ -97,8 +107,12 @@ int main(int argc, char** argv) {
 
     font_init();
     input_set_mapping();
-    level_init();
-    scene_init();
+    level_init(level_path);
+    if (edit_mode) {
+        edit_scene_init();
+    } else {
+        scene_init();
+    }
 
     glUseProgram(screen_shader);
     glUniform1i(glGetUniformLocation(screen_shader, "screen_texture"), 0);
@@ -204,14 +218,14 @@ int main(int argc, char** argv) {
         }
 
         // Update
-        if (!edit_mode) {
-            scene_update(delta);
-        } else {
+        if (edit_mode) {
             if (SDL_GetRelativeMouseMode() == SDL_TRUE) {
-                level_edit_update(delta);
+                edit_scene_update(delta);
             } else {
                 edit_update();
             }
+        } else {
+            scene_update(delta);
         }
 
         // Render onto framebuffer
@@ -222,8 +236,12 @@ int main(int argc, char** argv) {
         glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            // edit.render();
-        scene_render();
+        if (edit_mode) {
+            edit_render();
+            edit_scene_render();
+        } else {
+            scene_render();
+        }
 
         // Render text
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

@@ -12,14 +12,14 @@
 #include <stb_image.h>
 
 #include <cstdio>
+#include <fstream>
+
+std::string file_path;
 
 std::vector<Sector> sectors;
 std::vector<PointLight> lights;
-
-float camera_yaw = -90.0f;
-float camera_pitch = 0.0f;
-glm::vec3 camera_direction = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 camera_position = glm::vec3(0.0f, 0.5f, 0.0f);
+glm::vec3 player_spawn_point;
+std::vector<glm::vec3> enemy_spawn_points;
 
 Sector::Sector() {
     has_generated_buffers = false;
@@ -327,8 +327,104 @@ bool Frustum::is_inside(const Sector& sector) const {
     return true;
 }
 
-void level_init() {
+std::vector<std::string> split_string(std::string s, std::string delimeter) {
+    std::vector<std::string> words;
+    std::size_t pos_start = 0;
+    std::size_t pos_end;
+
+    while ((pos_end = s.find(delimeter, pos_start)) != std::string::npos) {
+        words.push_back(s.substr(pos_start, pos_end - pos_start));
+        pos_start = pos_end + delimeter.length();
+    }
+    words.push_back(s.substr(pos_start));
+
+    return words;
+}
+
+glm::vec3 string_to_vec3(std::string s) {
+    std::vector<std::string> words = split_string(s, ",");
+    return glm::vec3(std::stof(words[0]), std::stof(words[1]), std::stof(words[2]));
+}
+
+glm::vec2 string_to_vec2(std::string s) {
+    std::vector<std::string> words = split_string(s, ",");
+    return glm::vec2(std::stof(words[0]), std::stof(words[1]));
+}
+
+std::string vec3_to_string(glm::vec3 v) {
+    return std::to_string(v.x) + "," + std::to_string(v.y) + "," + std::to_string(v.z);
+}
+
+std::string vec2_to_string(glm::vec2 v) {
+    return std::to_string(v.x) + "," + std::to_string(v.y);
+}
+
+void level_save_file() {
+    if (file_path == "") {
+        return;
+    }
+
+    std::ofstream file(file_path);
+    if (!file.is_open()) {
+        return;
+    }
+
+    file << "p " << vec3_to_string(player_spawn_point) << std::endl;
+    for (glm::vec3 enemy_spawn_point : enemy_spawn_points) {
+        file << "e " << vec3_to_string(enemy_spawn_point) << std::endl;
+    }
+    for (Sector& sector : sectors) {
+        file << "s " << std::to_string(sector.floor_y) << " " << std::to_string(sector.ceiling_y) << " " << std::to_string(sector.floor_texture_index) << " " << std::to_string(sector.ceiling_texture_index) << " ";
+        for (unsigned int i = 0; i < sector.vertices.size(); i++) {
+            file << vec2_to_string(sector.vertices[i]) << " " << std::to_string(sector.walls[i].texture_index) << " " << std::to_string(sector.walls[i].exists);
+            if (i == sector.vertices.size() - 1) {
+                file << std::endl;
+            } else {
+                file << " ";
+            }
+        }
+    }
+
+    file.close();
+}
+
+
+void level_init(std::string path) {
+    player_spawn_point = glm::vec3(0.0f, 1.0f, 0.0f);
+
+    // load from file
+    file_path = path;
+    if (path != "") {
+        std::ifstream file(path);
+        std::string line;
+        if (file.is_open()) {
+            while (std::getline(file, line)) {
+                std::vector<std::string> words = split_string(line, " ");
+
+                if (words[0] == "p") {
+                    player_spawn_point = string_to_vec3(words[1]);
+                } else if (words[0] == "e") {
+                    enemy_spawn_points.push_back(string_to_vec3(words[1]));
+                } else if (words[0] == "s") {
+                    Sector new_sector;
+                    new_sector.floor_y = std::stof(words[1]);
+                    new_sector.ceiling_y = std::stof(words[2]);
+                    new_sector.floor_texture_index = std::stoul(words[3]);
+                    new_sector.ceiling_texture_index = std::stoul(words[4]);
+
+                    for (unsigned int i = 0; i < (words.size() - 5) / 3; i++) {
+                        unsigned int base_index = 5 + (i * 3);
+                        new_sector.add_vertex(string_to_vec2(words[base_index]), std::stoul(words[base_index + 1]), words[base_index + 2] == "1");
+                    }
+                    sectors.push_back(new_sector);
+                }
+            }
+            file.close();
+        }
+    }
+
     // create sectors
+    /*
     Sector a;
     a.add_vertex(glm::vec2(-3.0f, -1.0f), 0, true);
     a.add_vertex(glm::vec2(0.0f, -5.0f), 0, false);
@@ -362,6 +458,7 @@ void level_init() {
         .quadratic = 0.0019f
     };
     lights.push_back(light);
+    */
 
     glUseProgram(texture_shader);
     glUniform1i(glGetUniformLocation(texture_shader, "texture_array"), 0);
@@ -399,52 +496,10 @@ void level_init_sectors() {
     }
 }
 
-void level_edit_update(float delta) {
-    camera_yaw += input.mouse_raw_xrel * 0.1f;
-    camera_pitch -= input.mouse_raw_yrel * 0.1f;
-    camera_pitch = std::min(std::max(camera_pitch, -89.0f), 89.0f);
-    camera_direction = glm::normalize(glm::vec3(
-                    cos(glm::radians(camera_yaw)) * cos(glm::radians(camera_pitch)),
-                    sin(glm::radians(camera_pitch)),
-                    sin(glm::radians(camera_yaw)) * cos(glm::radians(camera_pitch))));
-
-    glm::vec3 camera_velocity = glm::vec3(0.0f, 0.0f, 0.0f);
-    float camera_speed = 0.2f;
-    if (input.is_action_pressed[INPUT_FORWARD]) {
-        camera_velocity += camera_direction;
-    }
-    if (input.is_action_pressed[INPUT_BACKWARD]) {
-        camera_velocity += -camera_direction;
-    }
-    if (input.is_action_pressed[INPUT_UP]) {
-        camera_velocity += glm::vec3(0.0f, 1.0f, 0.0f);
-    }
-    if (input.is_action_pressed[INPUT_DOWN]) {
-        camera_velocity += glm::vec3(0.0f, -1.0f, 0.0f);
-    }
-    if (input.is_action_pressed[INPUT_LEFT]) {
-        camera_velocity += -glm::normalize(glm::cross(camera_direction, glm::vec3(0.0f, 1.0f, 0.0f)));
-    }
-    if (input.is_action_pressed[INPUT_RIGHT]) {
-        camera_velocity += glm::normalize(glm::cross(camera_direction, glm::vec3(0.0f, 1.0f, 0.0f)));
-    }
-    if (glm::length(camera_velocity) > 1.0f) {
-        camera_velocity = glm::normalize(camera_velocity);
-    }
-
-    camera_position += camera_velocity * camera_speed * delta;
-}
-
 void level_render(glm::mat4 view, glm::mat4 projection, glm::vec3 view_pos, glm::vec3 flashlight_direction, bool flashlight_on) {
     glUseProgram(texture_shader);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D_ARRAY, resource_textures);
-
-    // view / projection transformations
-    /*if (!edit_mode) {
-    } else {
-        view = glm::lookAt(camera_position, camera_position + camera_direction, glm::vec3(0.0f, 1.0f, 0.0f));
-    }*/
 
     glUniform1ui(glGetUniformLocation(texture_shader, "flashlight_on"), flashlight_on);
     glUniformMatrix4fv(glGetUniformLocation(texture_shader, "view"), 1, GL_FALSE, glm::value_ptr(view));

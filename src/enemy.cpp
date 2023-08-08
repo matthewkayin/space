@@ -55,6 +55,8 @@ void EnemyBulletHole::render() {
 Enemy::Enemy() {
     position = glm::vec3(0.0f, 1.0f, -1.0f);
     direction = glm::vec3(0.0f, 0.0f, 1.0f);
+    facing_direction = direction;
+    angle = 0.0f;
 
     animation.add_animation(ENEMY_ANIMATION_IDLE, {
         .start_frame = 0,
@@ -73,7 +75,6 @@ Enemy::Enemy() {
     });
 
     hurtbox_extents = glm::vec2((100.0f / 2.0f) / (SCREEN_WIDTH / 2), (120.0f / 2.0f) / (SCREEN_HEIGHT / 2));
-    glm::vec3 facing_direction = direction;
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
     glm::mat4 model = glm::inverse(glm::lookAt(position, position + facing_direction, up));
     hurtbox_raycast_plane = raycast_add_plane({
@@ -90,11 +91,28 @@ Enemy::Enemy() {
     is_dead = false;
 }
 
-void Enemy::update(float delta) {
+void Enemy::update(glm::vec3 player_position, float delta) {
     if (is_dead) {
         return;
     }
 
+    // determine facing direction and angle
+    facing_direction = glm::normalize(glm::vec3(player_position.x, position.y, player_position.z) - position);
+    angle = atan2(direction.z - facing_direction.z, direction.x - facing_direction.x) * (180 / 3.14) * 2;
+    if (angle > 180.0f) {
+        angle = -(360.0f - angle);
+    }
+
+    bool sees_player = false;
+    if (abs(angle) < 90.0f) {
+        RaycastResult result = raycast_cast(position, player_position - position, glm::length(player_position - position), true);
+        if (!result.hit) {
+            sees_player = true;
+        }
+    }
+    printf("sees player %i\n", sees_player);
+
+    // update animation
     animation.update(delta);
     if (animation.animation == ENEMY_ANIMATION_DIE && animation.is_finished) {
         is_dead = true;
@@ -108,14 +126,13 @@ void Enemy::take_damage(int amount) {
     }
 }
 
-void Enemy::render(glm::vec3 player_position) {
+void Enemy::render() {
     if (is_dead) {
         return;
     }
 
     glUniform2iv(glGetUniformLocation(billboard_shader, "extents"), 1, glm::value_ptr(resource_extents[resource_wasp]));
 
-    glm::vec3 facing_direction = glm::normalize(glm::vec3(player_position.x, position.y, player_position.z) - position);
     glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
     if (std::abs(glm::dot(up, facing_direction)) == 1.0f) {
         up = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -124,10 +141,6 @@ void Enemy::render(glm::vec3 player_position) {
     glUniformMatrix4fv(glGetUniformLocation(billboard_shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
     glUniform3fv(glGetUniformLocation(billboard_shader, "normal"), 1, glm::value_ptr(facing_direction));
 
-    float angle = atan2(direction.z - facing_direction.z, direction.x - facing_direction.x) * (180 / 3.14) * 2;
-    if (angle > 180.0f) {
-        angle = -(360.0f - angle);
-    }
     animation_offset = (unsigned int)(abs(angle) / 36.0f);
     flip_h = angle < 0.0f && animation_offset >= 1 && animation_offset <= 3;
 
