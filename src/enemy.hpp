@@ -26,7 +26,11 @@ struct Enemy {
     unsigned int animation_offset;
     bool flip_h;
 
+    int health;
+    bool is_dead;
+
     Enemy();
     void update(float delta);
+    void take_damage(int amount);
     void render(glm::vec3 player_position);
 };

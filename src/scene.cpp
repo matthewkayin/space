@@ -43,21 +43,30 @@ void scene_update(float delta) {
             });
         } else if (plane.type == PLANE_TYPE_ENEMY) {
             enemy_bullet_holes.push_back(EnemyBulletHole(player.raycast_result.point + (plane.normal * 0.05f), plane.normal));
+            enemies[plane.id].take_damage(1);
         }
     }
 
-    for (Enemy& enemy : enemies) {
-        enemy.update(delta);
+    std::vector<unsigned int> indices_to_remove;
+    for (unsigned int i = 0; i < enemies.size(); i++) {
+        enemies[i].update(delta);
+        if (enemies[i].is_dead) {
+            indices_to_remove.push_back(i);
+        }
     }
+    for (unsigned int index : indices_to_remove) {
+        raycast_planes.erase(raycast_planes.begin() + enemies[index].hurtbox_raycast_plane);
+        enemies.erase(enemies.begin() + index);
+    }
+    indices_to_remove.clear();
 
-    std::vector<unsigned int> finished_enemy_bullet_holes;
     for (unsigned int i = 0; i < enemy_bullet_holes.size(); i++) {
         enemy_bullet_holes[i].update(delta);
         if (enemy_bullet_holes[i].animation.is_finished) {
-            finished_enemy_bullet_holes.push_back(i);
+            indices_to_remove.push_back(i);
         }
     }
-    for (unsigned int index : finished_enemy_bullet_holes) {
+    for (unsigned int index : indices_to_remove) {
         enemy_bullet_holes.erase(enemy_bullet_holes.begin() + index);
     }
 }
@@ -118,43 +127,57 @@ void scene_move_and_slide(glm::vec3* position, glm::vec3* velocity, float delta)
         collided = false;
         attempts++;
 
+        std::vector<glm::vec2> wall_a;
+        std::vector<glm::vec2> wall_b;
+        std::vector<glm::vec3> wall_normal;
         for (Sector* sector : nearby_sectors) {
             for (unsigned int wall = 0; wall < sector->vertices.size(); wall++) {
                 if (!sector->walls[wall].exists) {
                     continue;
                 }
 
-                glm::vec2 velocity2d = glm::vec2(actual_velocity.x, actual_velocity.z);
-                glm::vec2 predicted_origin2d = origin2d + velocity2d;
-
-                glm::vec2 wallv = sector->vertices[(wall + 1) % sector->vertices.size()] - sector->vertices[wall];
-                glm::vec2 f = sector->vertices[wall] - predicted_origin2d;
-                float a = glm::dot(wallv, wallv);
-                float b = 2 * glm::dot(f, wallv);
-                float c = glm::dot(f, f) - 0.25f;
-                float discriminant = (b * b) - (4.0f * a * c);
-
-                if (discriminant < 0.0f) {
-                    continue;
-                }
-
-                discriminant = sqrt(discriminant);
-                float t1 = (-b - discriminant) / (2.0f * a);
-                float t2 = (-b + discriminant) / (2.0f * a);
-
-                if (!(t1 >= 0.0f && t1 <= 1.0f) && !(t2 >= 0.0f && t2 <= 1.0f)) {
-                    continue;
-                }
-
-                glm::vec3 velocity_in_wall_normal_direction = sector->walls[wall].normal * glm::dot(actual_velocity, sector->walls[wall].normal);
-                *velocity -= velocity_in_wall_normal_direction;
-                actual_velocity = actual_velocity - velocity_in_wall_normal_direction;
-                collided = true;
+                wall_a.push_back(sector->vertices[(wall + 1) % sector->vertices.size()]);
+                wall_b.push_back(sector->vertices[wall]);
+                wall_normal.push_back(sector->walls[wall].normal);
             }
         }
-        /*for (Enemy& enemy : enemies) {
-            if (position->y)
-        }*/
+        for (Enemy& enemy : enemies) {
+            RaycastPlane& enemy_plane = raycast_planes[enemy.hurtbox_raycast_plane];
+            if (position->y >= enemy_plane.a.y && position->y <= enemy_plane.d.y) {
+                wall_a.push_back(glm::vec2(enemy_plane.b.x, enemy_plane.b.z));
+                wall_b.push_back(glm::vec2(enemy_plane.a.x, enemy_plane.a.z));
+                wall_normal.push_back(enemy_plane.normal);
+            }
+        }
+
+        for (unsigned int wall_index = 0; wall_index < wall_a.size(); wall_index++) {
+            glm::vec2 velocity2d = glm::vec2(actual_velocity.x, actual_velocity.z);
+            glm::vec2 predicted_origin2d = origin2d + velocity2d;
+
+            glm::vec2 wallv = wall_a[wall_index] - wall_b[wall_index];
+            glm::vec2 f = wall_b[wall_index] - predicted_origin2d;
+            float a = glm::dot(wallv, wallv);
+            float b = 2 * glm::dot(f, wallv);
+            float c = glm::dot(f, f) - 0.25f;
+            float discriminant = (b * b) - (4.0f * a * c);
+
+            if (discriminant < 0.0f) {
+                continue;
+            }
+
+            discriminant = sqrt(discriminant);
+            float t1 = (-b - discriminant) / (2.0f * a);
+            float t2 = (-b + discriminant) / (2.0f * a);
+
+            if (!(t1 >= 0.0f && t1 <= 1.0f) && !(t2 >= 0.0f && t2 <= 1.0f)) {
+                continue;
+            }
+
+            glm::vec3 velocity_in_wall_normal_direction = wall_normal[wall_index] * glm::dot(actual_velocity, wall_normal[wall_index]);
+            *velocity -= velocity_in_wall_normal_direction;
+            actual_velocity = actual_velocity - velocity_in_wall_normal_direction;
+            collided = true;
+        }
     }
 
     if (attempts == 5) {

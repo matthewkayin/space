@@ -26,6 +26,7 @@ unsigned int resource_player_pistol;
 unsigned int resource_bullet_hole;
 unsigned int resource_wasp;
 unsigned int resource_wasp_bullet_hole;
+unsigned int resource_test;
 
 std::map<unsigned int, glm::ivec2> resource_extents;
 

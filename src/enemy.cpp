@@ -10,7 +10,9 @@
 #include <glm/gtc/type_ptr.hpp>
 
 enum EnemyAnimation {
-    ENEMY_ANIMATION_IDLE
+    ENEMY_ANIMATION_IDLE,
+    ENEMY_ANIMATION_ATTACK,
+    ENEMY_ANIMATION_DIE
 };
 
 EnemyBulletHole::EnemyBulletHole(glm::vec3 position, glm::vec3 normal) {
@@ -59,6 +61,16 @@ Enemy::Enemy() {
         .end_frame = 2,
         .frame_time = 2.0f,
     });
+    animation.add_animation(ENEMY_ANIMATION_ATTACK, {
+        .start_frame = 16,
+        .end_frame = 18,
+        .frame_time = 2.0f
+    });
+    animation.add_animation(ENEMY_ANIMATION_DIE, {
+        .start_frame = 19,
+        .end_frame = 21,
+        .frame_time = 2.0f
+    });
 
     hurtbox_extents = glm::vec2((100.0f / 2.0f) / (SCREEN_WIDTH / 2), (120.0f / 2.0f) / (SCREEN_HEIGHT / 2));
     glm::vec3 facing_direction = direction;
@@ -73,13 +85,34 @@ Enemy::Enemy() {
         .d = glm::vec3(model * glm::vec4(-hurtbox_extents.x, hurtbox_extents.y, 0.0f, 1.0f)),
         .normal = facing_direction
     });
+
+    health = 3;
+    is_dead = false;
 }
 
 void Enemy::update(float delta) {
+    if (is_dead) {
+        return;
+    }
+
     animation.update(delta);
+    if (animation.animation == ENEMY_ANIMATION_DIE && animation.is_finished) {
+        is_dead = true;
+    }
+}
+
+void Enemy::take_damage(int amount) {
+    health -= amount;
+    if (health <= 0) {
+        animation.set_animation(ENEMY_ANIMATION_DIE);
+    }
 }
 
 void Enemy::render(glm::vec3 player_position) {
+    if (is_dead) {
+        return;
+    }
+
     glUniform2iv(glGetUniformLocation(billboard_shader, "extents"), 1, glm::value_ptr(resource_extents[resource_wasp]));
 
     glm::vec3 facing_direction = glm::normalize(glm::vec3(player_position.x, position.y, player_position.z) - position);
@@ -99,7 +132,13 @@ void Enemy::render(glm::vec3 player_position) {
     flip_h = angle < 0.0f && animation_offset >= 1 && animation_offset <= 3;
 
     glUniform1ui(glGetUniformLocation(billboard_shader, "flip_h"), flip_h);
-    glUniform1ui(glGetUniformLocation(billboard_shader, "frame"), animation.frame + (animation_offset * 3));
+
+    unsigned int animation_frame = animation.frame;
+    if (animation.animation == ENEMY_ANIMATION_IDLE) {
+        animation_frame += animation_offset * 3;
+    }
+
+    glUniform1ui(glGetUniformLocation(billboard_shader, "frame"), animation_frame);
 
     glBindTexture(GL_TEXTURE_2D_ARRAY, resource_wasp);
     glBindVertexArray(quad_vao);
