@@ -34,6 +34,7 @@ uniform SpotLight player_flashlight;
 uniform sampler2DArray u_texture_array;
 uniform uint frame;
 uniform uint flashlight_on;
+uniform uint lighting_enabled;
 
 uniform uint flip_h;
 
@@ -44,13 +45,16 @@ void main() {
     vec3 view_direction = normalize(view_pos - frag_pos);
 
     vec3 light_result;
-    // light_result = vec3(1.0, 1.0, 1.0) * 0.025;
-    light_result = vec3(0.0, 0.0, 0.0);
-    if (flashlight_on == 1) {
-        light_result += calculate_spot_light(player_flashlight, normal, frag_pos, view_direction);
-    }
-    for (uint i = 0; i < point_light_count; i++) {
-        light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);
+    if (lighting_enabled == 1) {
+        light_result = vec3(1.0, 1.0, 1.0) * 0.025;
+        if (flashlight_on == 1) {
+            light_result += calculate_spot_light(player_flashlight, normal, frag_pos, view_direction);
+        }
+        for (uint i = 0; i < point_light_count; i++) {
+            light_result += calculate_point_light(point_lights[i], normal, frag_pos, view_direction);
+        }
+    } else {
+        light_result = vec3(1.0, 1.0, 1.0);
     }
 
     vec3 sample_coordinate = vec3(texture_coordinate.x, texture_coordinate.y, frame);

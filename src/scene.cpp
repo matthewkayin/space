@@ -21,6 +21,7 @@ void scene_init() {
     glUseProgram(billboard_shader);
     glUniform1i(glGetUniformLocation(billboard_shader, "u_texture_array"), 0);
     glUniform1ui(glGetUniformLocation(billboard_shader, "frame"), 0);
+    glUniform1ui(glGetUniformLocation(billboard_shader, "lighting_enabled"), true);
     glUniform2iv(glGetUniformLocation(billboard_shader, "screen_size"), 1, glm::value_ptr(screen_size));
     glUseProgram(ui_shader);
     glUniform2iv(glGetUniformLocation(ui_shader, "screen_size"), 1, glm::value_ptr(screen_size));

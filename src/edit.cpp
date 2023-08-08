@@ -17,7 +17,8 @@ enum Mode {
     MODE_VERTEX,
     MODE_NEW_SECTOR,
     MODE_OBJECT,
-    MODE_NEW_OBJECT
+    MODE_NEW_OBJECT,
+    MODE_SAVED_FILE
 };
 
 enum ObjectType {
@@ -357,14 +358,14 @@ void edit_update() {
         }
 
         // enter object mode
-        if (mode == MODE_SECTOR && !dragging && input.is_action_just_pressed[INPUT_O]) {
+        if ((mode == MODE_SECTOR || mode == MODE_SAVED_FILE) && !dragging && input.is_action_just_pressed[INPUT_O]) {
             mode = MODE_OBJECT;
             selected_sectors.clear();
             refresh_ui_boxes();
         }
 
         // enter sector mode
-        if (mode == MODE_OBJECT && !dragging && input.is_action_just_pressed[INPUT_BACKWARD]) {
+        if ((mode == MODE_OBJECT || mode == MODE_SAVED_FILE) && !dragging && input.is_action_just_pressed[INPUT_BACKWARD]) {
             mode = MODE_SECTOR;
             object_selections.clear();
             refresh_ui_boxes();
@@ -402,6 +403,10 @@ void edit_update() {
         // save file
         if (mode != MODE_NEW_OBJECT && mode != MODE_NEW_SECTOR && !dragging && input.is_action_just_pressed[INPUT_FLASHLIGHT]) {
             level_save_file();
+            mode = MODE_SAVED_FILE;
+            object_selections.clear();
+            selected_sectors.clear();
+            refresh_ui_boxes();
         }
     // mouse is inside ui rect
     } else {
@@ -485,13 +490,13 @@ void edit_update() {
 
         // set ceiling texture
         if (mode == MODE_SECTOR && ui_hover_index != -1 && input.is_action_just_pressed[INPUT_T]) {
-            sectors[ui_hover_index].ceiling_texture_index = current_texture;
+            sectors[selected_sectors[ui_hover_index]].ceiling_texture_index = current_texture;
             level_init_sectors();
         }
 
         // set floor texture
         if (mode == MODE_SECTOR && ui_hover_index != -1 && input.is_action_just_pressed[INPUT_G]) {
-            sectors[ui_hover_index].floor_texture_index = current_texture;
+            sectors[selected_sectors[ui_hover_index]].floor_texture_index = current_texture;
             level_init_sectors();
         }
 
@@ -615,7 +620,9 @@ void edit_render() {
     }
 
     text_y_offset = 5;
-    if (mode == MODE_SECTOR) {
+    if (mode == MODE_SAVED_FILE) {
+        edit_render_ui_text("Saved file");
+    } else if (mode == MODE_SECTOR) {
         edit_render_ui_text("Sector Mode");
         for (unsigned int selected_sector : selected_sectors) {
             edit_render_ui_text("Sector " + std::to_string(selected_sector));
