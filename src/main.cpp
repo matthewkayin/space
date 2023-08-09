@@ -41,13 +41,18 @@ unsigned int fps = 0;
 int main(int argc, char** argv) {
     edit_mode = false;
     std::string level_path = "";
-    for (unsigned int i = 0; i < argc; i++) {
+    for (int i = 0; i < argc; i++) {
         std::string arg = std::string(argv[i]);
         if (arg == "--edit") {
             edit_mode = true;
         } else if (arg.find("--level") != std::string::npos) {
             level_path = arg.substr(arg.find("=") + 1);
         }
+    }
+
+    if (!edit_mode) {
+        WINDOW_WIDTH = 1280;
+        WINDOW_HEIGHT = 720;
     }
 
     srand(time(NULL));
@@ -245,7 +250,8 @@ int main(int argc, char** argv) {
 
         // Render text
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        font_hack_10pt.render_text("FPS: " + std::to_string(fps), 0.0f, 0.0f, glm::vec3(1.0f, 1.0f, 1.0f));
+        std::string fps_text = "FPS " + std::to_string(fps);
+        font_hack_10pt.render_text(fps_text, SCREEN_WIDTH - (fps_text.length() * 10.0f), 0.0f, glm::vec3(1.0f, 1.0f, 1.0f));
 
         // Render edit window
         if (edit_mode) {

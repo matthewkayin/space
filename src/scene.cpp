@@ -37,6 +37,7 @@ void scene_init() {
 }
 
 void scene_update(float delta) {
+    // update player
     player.update(delta);
     scene_move_and_slide(&player.position, &player.velocity, delta);
     if (player.raycast_result.hit) {
@@ -52,11 +53,16 @@ void scene_update(float delta) {
         }
     }
 
+    // update enemies
     std::vector<unsigned int> indices_to_remove;
     for (unsigned int i = 0; i < enemies.size(); i++) {
         enemies[i].update(player.position, delta);
+
         if (enemies[i].is_dead) {
             indices_to_remove.push_back(i);
+        }
+        if (enemies[i].hit_player) {
+            player.take_damage(7);
         }
     }
     for (unsigned int index : indices_to_remove) {
@@ -65,6 +71,7 @@ void scene_update(float delta) {
     }
     indices_to_remove.clear();
 
+    // update enemy bullet holes
     for (unsigned int i = 0; i < enemy_bullet_holes.size(); i++) {
         enemy_bullet_holes[i].update(delta);
         if (enemy_bullet_holes[i].animation.is_finished) {

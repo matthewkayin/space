@@ -31,6 +31,10 @@ struct Enemy {
     int health;
     bool is_dead;
 
+    bool has_seen_player;
+    bool hit_player;
+    bool has_hit;
+
     Enemy();
     void update(glm::vec3 player_position, float delta);
     void take_damage(int amount);

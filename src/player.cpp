@@ -41,6 +41,9 @@ void Player::init() {
     clip_max = 9;
     reserve_ammo = 9 * 6;
 
+    health = 100;
+    max_health = 100;
+
     animation.add_animation(ANIMATION_PISTOL_IDLE, {
         .start_frame = 0,
         .end_frame = 0,
@@ -156,6 +159,10 @@ void Player::update(float delta) {
     }
 }
 
+void Player::take_damage(unsigned int amount) {
+    health -= std::min(amount, health);
+}
+
 void Player::render() {
     // prepare billboard shader for gun
     glUniform2iv(glGetUniformLocation(billboard_shader, "extents"), 1, glm::value_ptr(resource_extents[resource_player_pistol]));
@@ -206,6 +213,8 @@ void Player::render() {
     glBindVertexArray(0);
 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    std::string health_string = "HEALTH: " + std::to_string(health) + "/" + std::to_string(max_health);
+    font_hack_10pt.render_text(health_string, 0.0f, 0.0f, glm::vec3(1.0f, 1.0f, 1.0f));
     std::string ammo_string = "AMMO: " + std::to_string(clip_ammo) + "/" + std::to_string(reserve_ammo);
-    font_hack_10pt.render_text(ammo_string, SCREEN_WIDTH - (ammo_string.length() * 10), 0.0f, glm::vec3(1.0f, 1.0f, 1.0f));
+    font_hack_10pt.render_text(ammo_string, 0.0f, 10.0f, glm::vec3(1.0f, 1.0f, 1.0f));
 }

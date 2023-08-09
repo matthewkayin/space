@@ -89,6 +89,10 @@ Enemy::Enemy() {
 
     health = 3;
     is_dead = false;
+
+    has_seen_player = false;
+    hit_player = false;
+    has_hit = false;
 }
 
 void Enemy::update(glm::vec3 player_position, float delta) {
@@ -96,26 +100,75 @@ void Enemy::update(glm::vec3 player_position, float delta) {
         return;
     }
 
+    hit_player = false;
+
     // determine facing direction and angle
     facing_direction = glm::normalize(glm::vec3(player_position.x, position.y, player_position.z) - position);
-    angle = atan2(direction.z - facing_direction.z, direction.x - facing_direction.x) * (180 / 3.14) * 2;
+    float base_angle = atan2(direction.z, direction.x) * (180 / 3.14f);
+    angle = (atan2(facing_direction.z, facing_direction.x) * (180 / 3.14f)) - base_angle;
     if (angle > 180.0f) {
-        angle = -(360.0f - angle);
+        angle = -180.0f + (angle - 180.0f);
+    } else if (angle < -180.0f) {
+        angle = 180.0f - (-angle - 180.0f);
     }
 
-    bool sees_player = false;
-    if (abs(angle) < 90.0f) {
-        RaycastResult result = raycast_cast(position, player_position - position, glm::length(player_position - position), true);
+    if (!has_seen_player && abs(angle) < 90.0f) {
+        RaycastResult result = raycast_cast(position, glm::normalize(player_position - position), glm::length(player_position - position), true);
         if (!result.hit) {
-            sees_player = true;
+            has_seen_player = true;
         }
     }
-    printf("sees player %i\n", sees_player);
+
+    if (has_seen_player && abs(angle) < 30.0f && animation.animation == ENEMY_ANIMATION_IDLE && glm::length(position - player_position) <= 1.0f) {
+        animation.set_animation(ENEMY_ANIMATION_ATTACK);
+        has_hit = true;
+    }
+
+    if (has_seen_player) {
+        direction = direction + ((facing_direction - direction) * 0.05f * delta);
+        float dist2d = glm::length(glm::vec2(player_position.x, player_position.z) - glm::vec2(position.x, position.z));
+        glm::vec3 velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+        if (dist2d > 1.0f) {
+            velocity += direction * std::min(dist2d, 0.1f * delta);
+        }
+        if (abs(position.y - player_position.y) > 0.2f) {
+            float y_direction = 1.0f;
+            if (player_position.y < position.y) {
+                y_direction = -1.0f;
+            }
+            velocity.y += y_direction * std::min(0.05f * delta, abs(position.y - player_position.y));
+        }
+
+        RaycastResult result = raycast_cast(position, glm::normalize(velocity), 1.0f, true);
+        float velocity_length = glm::length(velocity);
+        unsigned int attempts = 1;
+        while (result.hit && attempts < 5) {
+            glm::vec3 plane_normal = raycast_planes[result.plane].normal;
+            glm::vec3 velocity_in_wall_normal_direction = plane_normal * glm::dot(velocity, plane_normal);
+            velocity -= velocity_in_wall_normal_direction;
+            velocity = glm::normalize(velocity) * velocity_length;
+
+            result = raycast_cast(position, glm::normalize(velocity), 1.0f, true);
+            attempts++;
+        }
+        if (attempts == 5) {
+            velocity = glm::vec3(0.0f, 0.0f, 0.0f);
+        }
+
+        position += velocity;
+    }
 
     // update animation
     animation.update(delta);
     if (animation.animation == ENEMY_ANIMATION_DIE && animation.is_finished) {
         is_dead = true;
+    }
+    if (animation.animation == ENEMY_ANIMATION_ATTACK && animation.is_finished) {
+        animation.set_animation(ENEMY_ANIMATION_IDLE);
+    }
+    if (has_hit && animation.animation == ENEMY_ANIMATION_ATTACK && animation.frame == 17 && glm::length(position - player_position) <= 1.0f) {
+        hit_player = true;
+        has_hit = false;
     }
 }
 

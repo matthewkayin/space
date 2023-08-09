@@ -23,10 +23,14 @@ struct Player {
     float recoil;
     float recoil_cooldown;
 
+    unsigned int health;
+    unsigned int max_health;
+
     RaycastResult raycast_result;
 
     Player() {};
     void init();
     void update(float delta);
+    void take_damage(unsigned int amount);
     void render();
 };

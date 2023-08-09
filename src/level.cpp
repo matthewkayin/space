@@ -426,27 +426,7 @@ void level_init(std::string path) {
         }
     }
 
-    // create sectors
     /*
-    Sector a;
-    a.add_vertex(glm::vec2(-3.0f, -1.0f), 0, true);
-    a.add_vertex(glm::vec2(0.0f, -5.0f), 0, false);
-    a.add_vertex(glm::vec2(3.0f, -1.0f), 0, true);
-    a.add_vertex(glm::vec2(3.0f, 5.0f), 0, true);
-    a.add_vertex(glm::vec2(-3.0f, 5.0f), 0, true);
-    a.floor_y = 0.0f;
-    a.ceiling_y = 3.0f;
-    sectors.push_back(a);
-
-    Sector b;
-    b.add_vertex(glm::vec2(3.0f, -9.0f), 0, true);
-    b.add_vertex(glm::vec2(6.0f, -5.0f), 0, true);
-    b.add_vertex(glm::vec2(3.0f, -1.0f), 0, false);
-    b.add_vertex(glm::vec2(0.0f, -5.0f), 0, true);
-    b.floor_y = 0.0f;
-    b.ceiling_y = 3.0f;
-    sectors.push_back(b);
-
     // create lights
     PointLight light = {
         .position = glm::vec3(-2.8, 1.5f, 4.8f),
