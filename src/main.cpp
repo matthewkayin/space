@@ -37,6 +37,8 @@ unsigned long last_time = SDL_GetTicks();
 unsigned long last_second = SDL_GetTicks();
 unsigned int frames = 0;
 unsigned int fps = 0;
+float elapsed = 0.0f;
+float screen_anim_timer = 0.0f;
 
 int main(int argc, char** argv) {
     edit_mode = false;
@@ -166,8 +168,8 @@ int main(int argc, char** argv) {
     glGenTextures(1, &texture_color_buffer);
     glBindTexture(GL_TEXTURE_2D, texture_color_buffer);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCREEN_WIDTH, SCREEN_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_color_buffer, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -248,16 +250,6 @@ int main(int argc, char** argv) {
             scene_render();
         }
 
-        // Render text
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        std::string fps_text = "FPS " + std::to_string(fps);
-        font_hack_10pt.render_text(fps_text, SCREEN_WIDTH - (fps_text.length() * 10.0f), 0.0f, glm::vec3(1.0f, 1.0f, 1.0f));
-
-        // Render edit window
-        if (edit_mode) {
-            edit_render();
-        }
-
         // Render framebuffer to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -267,12 +259,24 @@ int main(int argc, char** argv) {
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(screen_shader);
+        glUniform1f(glGetUniformLocation(screen_shader, "elapsed"), elapsed);
+        glUniform1f(glGetUniformLocation(screen_shader, "time"), screen_anim_timer);
         glBindVertexArray(quad_vao);
         glBindTexture(GL_TEXTURE_2D, texture_color_buffer);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
 
+        // Render fps
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        std::string fps_text = "FPS " + std::to_string(fps);
+        font_hack_10pt.render_text(fps_text, SCREEN_WIDTH - (fps_text.length() * 10.0f), 0.0f, glm::vec3(1.0f, 1.0f, 1.0f));
+
         SDL_GL_SwapWindow(window);
+
+        // Render edit window
+        if (edit_mode) {
+            edit_render();
+        }
         frames++;
     }
 

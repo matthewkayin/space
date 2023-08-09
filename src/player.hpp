@@ -5,6 +5,12 @@
 
 #include <glm/glm.hpp>
 
+enum ScreenAnimation {
+    SCREEN_ANIMATION_NONE,
+    SCREEN_ANIMATION_FLASH,
+    SCREEN_ANIMATION_FADE
+};
+
 struct Player {
     glm::vec3 position;
     glm::vec3 velocity;
@@ -15,6 +21,7 @@ struct Player {
     glm::vec3 flashlight_direction;
 
     Animation animation;
+    ScreenAnimation screen_animation;
 
     unsigned int reserve_ammo;
     unsigned int clip_ammo;
@@ -25,6 +32,7 @@ struct Player {
 
     unsigned int health;
     unsigned int max_health;
+    bool is_dead;
 
     RaycastResult raycast_result;
 

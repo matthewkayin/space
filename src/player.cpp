@@ -43,6 +43,7 @@ void Player::init() {
 
     health = 100;
     max_health = 100;
+    is_dead = false;
 
     animation.add_animation(ANIMATION_PISTOL_IDLE, {
         .start_frame = 0,
@@ -59,6 +60,11 @@ void Player::init() {
         .end_frame = 30,
         .frame_time = 1.0f
     });
+
+    glUseProgram(screen_shader);
+    glUniform1ui(glGetUniformLocation(screen_shader, "player_health"), health);
+
+    screen_animation = SCREEN_ANIMATION_NONE;
 }
 
 void Player::update(float delta) {
@@ -157,10 +163,32 @@ void Player::update(float delta) {
             animation.set_animation(ANIMATION_PISTOL_IDLE);
         }
     }
+
+    // screen animation
+    elapsed += delta * (60.0f / 1000.0f);
+    if (screen_animation != SCREEN_ANIMATION_NONE){
+        screen_anim_timer += delta * (60.0f / 1000.0f);
+        if (screen_animation == SCREEN_ANIMATION_FLASH && screen_anim_timer >= 0.1f) {
+            screen_anim_timer = 0.0f;
+            screen_animation = SCREEN_ANIMATION_NONE;
+        }
+    }
 }
 
 void Player::take_damage(unsigned int amount) {
+    if (is_dead) {
+        return;
+    }
     health -= std::min(amount, health);
+    glUseProgram(screen_shader);
+    glUniform1ui(glGetUniformLocation(screen_shader, "player_health"), health);
+    if (health <= 0) {
+        is_dead = true;
+        screen_animation = SCREEN_ANIMATION_FADE;
+    } else if (screen_animation == SCREEN_ANIMATION_NONE) {
+        screen_animation = SCREEN_ANIMATION_FLASH;
+    }
+    screen_anim_timer = 0.0f;
 }
 
 void Player::render() {

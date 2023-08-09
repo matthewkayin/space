@@ -50,6 +50,7 @@ void scene_update(float delta) {
         } else if (plane.type == PLANE_TYPE_ENEMY) {
             enemy_bullet_holes.push_back(EnemyBulletHole(player.raycast_result.point + (plane.normal * 0.05f), plane.normal));
             enemies[plane.id].take_damage(1);
+            printf("hey\n");
         }
     }
 
