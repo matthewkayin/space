@@ -8,6 +8,7 @@ uniform sampler2D screen_texture;
 uniform float elapsed;
 uniform float time;
 uniform uint player_health = 100;
+uniform uint disable_noise = 0;
 
 const float corner_harshness = 0.5;
 const float corner_ease = 4.0;
@@ -45,12 +46,20 @@ void main() {
     vec3 noise = vec3(random(tuv));
     float player_health_percent = player_health / 100.0;
     float noise_percent = 0.05 + (0.1 * (1.0 - player_health_percent));
-    if (time > flash_start_time && time <= flash_start_time + flash_duration) {
+    if (disable_noise == 0 && time > flash_start_time && time <= flash_start_time + flash_duration) {
         noise_percent = 0.3;
     }
     if (time > fade_start_time) {
         float fade_percent = (time - fade_start_time) / (fade_end_time - fade_start_time);
-        noise_percent = 0.3 + (0.75 * fade_percent);
+
+        if (disable_noise == 0) {
+            noise_percent = 0.3 + (0.75 * fade_percent);
+        } else {
+            noise_percent = 0.3 + (0.3 * fade_percent);
+        }
+    }
+    if (disable_noise == 1) {
+        noise = vec3(1.0);
     }
 
     vec3 sampled = vec3(texture(screen_texture, tuv));
