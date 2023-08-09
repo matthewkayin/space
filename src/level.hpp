@@ -30,6 +30,11 @@ struct LevelBulletHole {
     glm::vec3 normal;
 };
 
+struct EnemySpawn {
+    glm::vec3 position;
+    glm::vec2 direction;
+};
+
 struct Sector {
     std::vector<glm::vec2> vertices;
     float floor_y;
@@ -64,7 +69,7 @@ struct Frustum {
 extern std::vector<Sector> sectors;
 extern std::vector<PointLight> lights;
 extern glm::vec3 player_spawn_point;
-extern std::vector<glm::vec3> enemy_spawn_points;
+extern std::vector<EnemySpawn> enemy_spawns;
 
 void level_save_file();
 void level_init(std::string path);

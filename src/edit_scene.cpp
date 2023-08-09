@@ -94,9 +94,9 @@ void edit_scene_render() {
     level_render(view, projection, camera_position, glm::vec3(0.0f), false);
 
     glUniform2iv(glGetUniformLocation(billboard_shader, "extents"), 1, glm::value_ptr(resource_extents[resource_wasp]));
-    for (glm::vec3 enemy_spawn_point : enemy_spawn_points) {
-        glm::vec3 facing_direction = glm::normalize(glm::vec3(camera_position.x, enemy_spawn_point.y, camera_position.z) - enemy_spawn_point);
-        glm::mat4 model = glm::inverse(glm::lookAt(enemy_spawn_point, enemy_spawn_point + facing_direction, glm::vec3(0.0f, 1.0f, 0.0f)));
+    for (EnemySpawn& enemy_spawn : enemy_spawns) {
+        glm::vec3 facing_direction = glm::normalize(glm::vec3(camera_position.x, enemy_spawn.position.y, camera_position.z) - enemy_spawn.position);
+        glm::mat4 model = glm::inverse(glm::lookAt(enemy_spawn.position, enemy_spawn.position + facing_direction, glm::vec3(0.0f, 1.0f, 0.0f)));
         glUniformMatrix4fv(glGetUniformLocation(billboard_shader, "model"), 1, GL_FALSE, glm::value_ptr(model));
         glUniform3fv(glGetUniformLocation(billboard_shader, "normal"), 1, glm::value_ptr(facing_direction));
 

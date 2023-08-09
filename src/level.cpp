@@ -19,7 +19,7 @@ std::string file_path;
 std::vector<Sector> sectors;
 std::vector<PointLight> lights;
 glm::vec3 player_spawn_point;
-std::vector<glm::vec3> enemy_spawn_points;
+std::vector<EnemySpawn> enemy_spawns;
 
 Sector::Sector() {
     has_generated_buffers = false;
@@ -370,8 +370,8 @@ void level_save_file() {
     }
 
     file << "p " << vec3_to_string(player_spawn_point) << std::endl;
-    for (glm::vec3 enemy_spawn_point : enemy_spawn_points) {
-        file << "e " << vec3_to_string(enemy_spawn_point) << std::endl;
+    for (EnemySpawn& enemy_spawn : enemy_spawns) {
+        file << "e " << vec3_to_string(enemy_spawn.position) << " " << vec2_to_string(enemy_spawn.direction) << std::endl;
     }
     for (Sector& sector : sectors) {
         file << "s " << std::to_string(sector.floor_y) << " " << std::to_string(sector.ceiling_y) << " " << std::to_string(sector.floor_texture_index) << " " << std::to_string(sector.ceiling_texture_index) << " ";
@@ -404,7 +404,10 @@ void level_init(std::string path) {
                 if (words[0] == "p") {
                     player_spawn_point = string_to_vec3(words[1]);
                 } else if (words[0] == "e") {
-                    enemy_spawn_points.push_back(string_to_vec3(words[1]));
+                    enemy_spawns.push_back({
+                        .position = string_to_vec3(words[1]),
+                        .direction = string_to_vec2(words[2])
+                    });
                 } else if (words[0] == "s") {
                     Sector new_sector;
                     new_sector.floor_y = std::stof(words[1]);

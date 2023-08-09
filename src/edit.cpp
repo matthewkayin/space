@@ -97,7 +97,7 @@ void refresh_ui_boxes() {
             lines_of_text = 3;
             num_boxes = sectors[selected_sectors[0]].vertices.size();
         } else if (mode == MODE_OBJECT) {
-            lines_of_text = 2;
+            lines_of_text = 3;
             num_boxes = object_selections.size();
         }
         for (unsigned int i = 0; i < num_boxes; i++) {
@@ -250,10 +250,10 @@ void edit_update() {
                     });
                 }
 
-                for (unsigned int i = 0; i < enemy_spawn_points.size(); i++) {
+                for (unsigned int i = 0; i < enemy_spawns.size(); i++) {
                     p = {
-                        .x = (4 * ((int)(enemy_spawn_points[i].x * 8.0f) + camera_offset.x) - 2),
-                        .y = (4 * ((int)(enemy_spawn_points[i].z * 8.0f) + camera_offset.y) - 2),
+                        .x = (4 * ((int)(enemy_spawns[i].position.x * 8.0f) + camera_offset.x) - 2),
+                        .y = (4 * ((int)(enemy_spawns[i].position.z * 8.0f) + camera_offset.y) - 2),
                         .w = 8,
                         .h = 8
                     };
@@ -269,11 +269,14 @@ void edit_update() {
                 refresh_ui_boxes();
             } else if (mode == MODE_NEW_OBJECT) {
                 if (new_object_type == OBJECT_ENEMY) {
-                    enemy_spawn_points.push_back(glm::vec3(mouse_snapped_position.x, 0.0f, mouse_snapped_position.y) / 8.0f);
+                    enemy_spawns.push_back({
+                        .position = glm::vec3(mouse_snapped_position.x, 0.0f, mouse_snapped_position.y) / 8.0f,
+                        .direction = glm::vec2(0.0f, 1.0f)
+                    });
                     mode = MODE_OBJECT;
                     object_selections.push_back({
                         .type = OBJECT_ENEMY,
-                        .index = (unsigned int)(enemy_spawn_points.size() - 1)
+                        .index = (unsigned int)(enemy_spawns.size() - 1)
                     });
                     refresh_ui_boxes();
                 }
@@ -394,7 +397,7 @@ void edit_update() {
         // delete object
         if (mode == MODE_OBJECT && input.is_action_just_pressed[INPUT_DELETE] && ui_hover_index != -1) {
             if (object_selections[ui_hover_index].type == OBJECT_ENEMY) {
-                enemy_spawn_points.erase(enemy_spawn_points.begin() + object_selections[ui_hover_index].index);
+                enemy_spawns.erase(enemy_spawns.begin() + object_selections[ui_hover_index].index);
                 object_selections.erase(object_selections.begin() + ui_hover_index);
             }
             refresh_ui_boxes();
@@ -505,7 +508,25 @@ void edit_update() {
             if (object_selections[ui_hover_index].type == OBJECT_PLAYER) {
                 player_spawn_point.y -= input.mouse_raw_yrel * 0.5f;
             } else if (object_selections[ui_hover_index].type == OBJECT_ENEMY) {
-                enemy_spawn_points[object_selections[ui_hover_index].index].y -= input.mouse_raw_yrel * 0.5f;
+                enemy_spawns[object_selections[ui_hover_index].index].position.y -= input.mouse_raw_yrel * 0.5f;
+            }
+        }
+
+        // change enemy direction
+        if (mode == MODE_OBJECT && ui_hover_index != -1 && object_selections[ui_hover_index].type == OBJECT_ENEMY && input.is_action_just_pressed[INPUT_RIGHT]) {
+            const glm::vec2 directions[] = {
+                glm::vec2(0.0f, 1.0f),
+                glm::vec2(-1.0f, 0.0f),
+                glm::vec2(0.0f, -1.0f),
+                glm::vec2(1.0f, 0.0f)
+            };
+
+            for (unsigned int direction_index = 0; direction_index < 4; direction_index++) {
+                if (enemy_spawns[object_selections[ui_hover_index].index].direction == directions[direction_index]) {
+                    unsigned int new_direction_index = (direction_index + 1) % 4;
+                    enemy_spawns[object_selections[ui_hover_index].index].direction = directions[new_direction_index];
+                    break;
+                }
             }
         }
     }
@@ -591,7 +612,7 @@ void edit_render() {
     SDL_RenderDrawRect(renderer, &p);
 
     // Render enemy spawns
-    for (unsigned int i = 0; i < enemy_spawn_points.size(); i++) {
+    for (unsigned int i = 0; i < enemy_spawns.size(); i++) {
         SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
         for (ObjectSelection& object_selection : object_selections) {
             if (object_selection.type == OBJECT_ENEMY && object_selection.index == i) {
@@ -601,8 +622,8 @@ void edit_render() {
         }
 
         p = {
-            .x = (int)(enemy_spawn_points[i].x * 8.0f) + camera_offset.x,
-            .y = (int)(enemy_spawn_points[i].z * 8.0f) + camera_offset.y,
+            .x = (int)(enemy_spawns[i].position.x * 8.0f) + camera_offset.x,
+            .y = (int)(enemy_spawns[i].position.z * 8.0f) + camera_offset.y,
             .w = 1,
             .h = 1
         };
@@ -652,7 +673,8 @@ void edit_render() {
                 edit_render_ui_text("y: " + std::to_string(player_spawn_point.y));
             } else if (object_selection.type == OBJECT_ENEMY) {
                 edit_render_ui_text("Enemy " + std::to_string(object_selection.index));
-                edit_render_ui_text("y: " + std::to_string(enemy_spawn_points[object_selection.index].y));
+                edit_render_ui_text("y: " + std::to_string(enemy_spawns[object_selection.index].position.y));
+                edit_render_ui_text("direction: " + std::to_string((int)enemy_spawns[object_selection.index].direction.x) + "," + std::to_string((int)enemy_spawns[object_selection.index].direction.y));
             }
         }
     } else if (mode == MODE_NEW_OBJECT) {

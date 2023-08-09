@@ -26,9 +26,10 @@ void scene_init() {
     glUseProgram(ui_shader);
     glUniform2iv(glGetUniformLocation(ui_shader, "screen_size"), 1, glm::value_ptr(screen_size));
 
-    for (glm::vec3 enemy_spawn_point : enemy_spawn_points) {
+    for (EnemySpawn& enemy_spawn : enemy_spawns) {
         Enemy enemy;
-        enemy.position = enemy_spawn_point;
+        enemy.position = enemy_spawn.position;
+        enemy.direction = glm::vec3(enemy_spawn.direction.x, 0.0f, enemy_spawn.direction.y);
         enemies.push_back(enemy);
     }
 
