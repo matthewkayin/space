@@ -104,7 +104,8 @@ void Sector::init_buffers(unsigned int index) {
             .b = wall_top_right,
             .c = wall_bot_right,
             .d = wall_bot_left,
-            .normal = walls[i].normal
+            .normal = walls[i].normal,
+            .enabled = true
         });
     }
 
@@ -134,7 +135,8 @@ void Sector::init_buffers(unsigned int index) {
         .b = glm::vec3(aabb[1]),
         .c = glm::vec3(aabb[2]),
         .d = glm::vec3(aabb[3]),
-        .normal = glm::vec3(0.0f, -1.0f, 0.0f)
+        .normal = glm::vec3(0.0f, -1.0f, 0.0f),
+        .enabled = true
     });
 
     // floor
@@ -145,7 +147,8 @@ void Sector::init_buffers(unsigned int index) {
         .b = aabb[5],
         .c = aabb[6],
         .d = aabb[7],
-        .normal = glm::vec3(0.0f, 1.0f, 0.0f)
+        .normal = glm::vec3(0.0f, 1.0f, 0.0f),
+        .enabled = true
     });
 
     // ceiling and floor

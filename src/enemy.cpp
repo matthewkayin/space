@@ -52,7 +52,7 @@ void EnemyBulletHole::render() {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-Enemy::Enemy() {
+Enemy::Enemy(unsigned int id) {
     position = glm::vec3(0.0f, 1.0f, -1.0f);
     direction = glm::vec3(0.0f, 0.0f, 1.0f);
     facing_direction = direction;
@@ -79,12 +79,13 @@ Enemy::Enemy() {
     glm::mat4 model = glm::inverse(glm::lookAt(position, position + facing_direction, up));
     hurtbox_raycast_plane = raycast_add_plane({
         .type = PLANE_TYPE_ENEMY,
-        .id = 0,
+        .id = id,
         .a = glm::vec3(model * glm::vec4(-hurtbox_extents.x, -hurtbox_extents.y, 0.0f, 1.0f)),
         .b = glm::vec3(model * glm::vec4(hurtbox_extents.x, -hurtbox_extents.y, 0.0f, 1.0f)),
         .c = glm::vec3(model * glm::vec4(hurtbox_extents.x, hurtbox_extents.y, 0.0f, 1.0f)),
         .d = glm::vec3(model * glm::vec4(-hurtbox_extents.x, hurtbox_extents.y, 0.0f, 1.0f)),
-        .normal = facing_direction
+        .normal = facing_direction,
+        .enabled = true
     });
 
     health = 3;
@@ -100,6 +101,7 @@ void Enemy::update(glm::vec3 player_position, float delta) {
         return;
     }
 
+    glm::vec3 velocity = glm::vec3(0.0f, 0.0f, 0.0f);
     hit_player = false;
 
     // determine facing direction and angle
@@ -127,7 +129,6 @@ void Enemy::update(glm::vec3 player_position, float delta) {
     if (has_seen_player) {
         direction = direction + ((facing_direction - direction) * 0.05f * delta);
         float dist2d = glm::length(glm::vec2(player_position.x, player_position.z) - glm::vec2(position.x, position.z));
-        glm::vec3 velocity = glm::vec3(0.0f, 0.0f, 0.0f);
         if (dist2d > 1.0f) {
             velocity += direction * std::min(dist2d, 0.1f * delta);
         }
@@ -146,6 +147,11 @@ void Enemy::update(glm::vec3 player_position, float delta) {
             glm::vec3 plane_normal = raycast_planes[result.plane].normal;
             glm::vec3 velocity_in_wall_normal_direction = plane_normal * glm::dot(velocity, plane_normal);
             velocity -= velocity_in_wall_normal_direction;
+
+            if (glm::length(velocity) == 0.0f) {
+                break;
+            }
+
             velocity = glm::normalize(velocity) * velocity_length;
 
             result = raycast_cast(position, glm::normalize(velocity), 1.0f, true);
@@ -170,12 +176,24 @@ void Enemy::update(glm::vec3 player_position, float delta) {
         hit_player = true;
         has_hit = false;
     }
+
+    // update bullet holes
+    std::vector<unsigned int> indices_to_remove;
+    for (EnemyBulletHole& bullet_hole : bullet_holes) {
+        bullet_hole.position += velocity;
+        bullet_hole.update(delta);
+    }
+    for (unsigned int index: indices_to_remove) {
+        bullet_holes.erase(bullet_holes.begin() + index);
+    }
 }
 
-void Enemy::take_damage(int amount) {
+void Enemy::take_damage(RaycastResult& result, int amount) {
     health -= amount;
     if (health <= 0) {
         animation.set_animation(ENEMY_ANIMATION_DIE);
+    } else {
+        bullet_holes.push_back(EnemyBulletHole(result.point + (raycast_planes[hurtbox_raycast_plane].normal * 0.05f), raycast_planes[hurtbox_raycast_plane].normal));
     }
 }
 
@@ -216,4 +234,8 @@ void Enemy::render() {
     raycast_planes[hurtbox_raycast_plane].c = glm::vec3(model * glm::vec4(hurtbox_extents.x, hurtbox_extents.y, 0.0f, 1.0f));
     raycast_planes[hurtbox_raycast_plane].d = glm::vec3(model * glm::vec4(-hurtbox_extents.x, hurtbox_extents.y, 0.0f, 1.0f));
     raycast_planes[hurtbox_raycast_plane].normal = facing_direction;
+
+    for (EnemyBulletHole& bullet_hole : bullet_holes) {
+        bullet_hole.render();
+    }
 }

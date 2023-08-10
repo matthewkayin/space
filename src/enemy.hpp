@@ -1,6 +1,7 @@
 #pragma once
 
 #include "animation.hpp"
+#include "raycast.hpp"
 
 #include <glm/glm.hpp>
 #include <vector>
@@ -21,6 +22,8 @@ struct Enemy {
     glm::vec3 facing_direction;
     float angle;
 
+    std::vector<EnemyBulletHole> bullet_holes;
+
     glm::vec2 hurtbox_extents;
     unsigned int hurtbox_raycast_plane;
 
@@ -35,8 +38,8 @@ struct Enemy {
     bool hit_player;
     bool has_hit;
 
-    Enemy();
+    Enemy(unsigned int id);
     void update(glm::vec3 player_position, float delta);
-    void take_damage(int amount);
+    void take_damage(RaycastResult& result, int amount);
     void render();
 };

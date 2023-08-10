@@ -16,6 +16,7 @@ struct RaycastPlane {
     glm::vec3 c;
     glm::vec3 d;
     glm::vec3 normal;
+    bool enabled;
 };
 
 struct RaycastResult {

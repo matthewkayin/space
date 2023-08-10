@@ -47,24 +47,15 @@ const SDL_Color selected_hidden_wall_color = { .r = 80, .g = 80, .b = 0, .a = 25
 const SDL_Color vertex_cursor_color = { .r = 255, .g = 255, .b = 255, .a = 128 };
 
 const unsigned int UI_WIDTH = 128;
-SDL_Rect ui_rect = {
-    .x = SCREEN_WIDTH - UI_WIDTH,
-    .y = 0,
-    .w = UI_WIDTH,
-    .h = SCREEN_HEIGHT
-};
-SDL_Rect texture_picker_rect = {
-    .x = ui_rect.x,
-    .y = SCREEN_HEIGHT - 64,
-    .w = 128,
-    .h = 64
-};
+SDL_Rect ui_rect;
+SDL_Rect texture_picker_rect;
 
 unsigned int scale = 4;
-unsigned int viewport_width = (SCREEN_WIDTH - UI_WIDTH) / scale;
-unsigned int viewport_height = SCREEN_HEIGHT / scale;
+unsigned int viewport_width = (WINDOW_WIDTH - UI_WIDTH) / scale;
+unsigned int viewport_height = WINDOW_HEIGHT / scale;
 
 glm::ivec2 camera_offset = glm::ivec2(viewport_width / 2, viewport_height / 2);
+glm::vec2 precise_camera_offset = glm::vec2(camera_offset);
 
 Mode mode = MODE_SECTOR;
 std::vector<unsigned int> selected_sectors;
@@ -117,11 +108,24 @@ void edit_render_ui_text(std::string text);
 void edit_render_text(std::string text, int x, int y);
 
 bool edit_init() {
+    ui_rect = {
+        .x = (int)(WINDOW_WIDTH - UI_WIDTH),
+        .y = 0,
+        .w = UI_WIDTH,
+        .h = (int)WINDOW_HEIGHT
+    };
+    texture_picker_rect = {
+        .x = ui_rect.x,
+        .y = (int)(WINDOW_HEIGHT - 64),
+        .w = 128,
+        .h = 64
+    };
+
     glm::ivec2 window_position;
     SDL_Rect display_bounds;
     SDL_GetDisplayBounds(0, &display_bounds);
-    window_position.x = (display_bounds.w / 2) - (SCREEN_WIDTH / 4) - SCREEN_WIDTH;
-    window_position.y = (display_bounds.h / 2) - (SCREEN_HEIGHT / 2);
+    window_position.x = (display_bounds.w / 2) - (WINDOW_WIDTH / 4) - WINDOW_WIDTH;
+    window_position.y = (display_bounds.h / 2) - (WINDOW_HEIGHT / 2);
 
     int img_flags = IMG_INIT_PNG;
     if (!(IMG_Init(img_flags) & img_flags)) {
@@ -139,7 +143,7 @@ bool edit_init() {
         return false;
     }
 
-    edit_window = SDL_CreateWindow("zerog", window_position.x, window_position.y, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+    edit_window = SDL_CreateWindow("zerog", window_position.x, window_position.y, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN);
     if (edit_window == NULL) {
         printf("Error creating edit window: %s\n", SDL_GetError());
         return -1;
@@ -199,7 +203,8 @@ void edit_update() {
 
         // camera panning
         if (input.is_action_pressed[INPUT_RCLICK]) {
-            camera_offset += glm::ivec2((int)(input.mouse_raw_xrel / 4.0f), (int)(input.mouse_raw_yrel / 4.0f));
+            precise_camera_offset += glm::vec2(input.mouse_raw_xrel / 4.0f, input.mouse_raw_yrel / 4.0f);
+            camera_offset = glm::ivec2(precise_camera_offset);
         }
 
         // stop dragging object
@@ -308,10 +313,6 @@ void edit_update() {
                         break;
                     }
                 }
-                if (dragging_vertex == -1){
-                    selected_sectors.clear();
-                    mode = MODE_SECTOR;
-                }
             }
 
             if (mode == MODE_SECTOR) {
@@ -326,6 +327,8 @@ void edit_update() {
                 for (ObjectSelection& object_selection : object_selections) {
                     if (object_selection.type == OBJECT_PLAYER) {
                         player_spawn_point += glm::vec3(drag_movement.x, 0.0f, drag_movement.y);
+                    } else if (object_selection.type == OBJECT_ENEMY) {
+                        enemy_spawns[object_selection.index].position += glm::vec3(drag_movement.x, 0.0f, drag_movement.y);
                     }
                 }
             }
@@ -693,7 +696,7 @@ void edit_render() {
     };
     SDL_Rect dst_rect = {
         .x = ui_rect.x + 64,
-        .y = SCREEN_HEIGHT - 64,
+        .y = (int)(viewport_height - 64),
         .w = 64,
         .h = 64
     };

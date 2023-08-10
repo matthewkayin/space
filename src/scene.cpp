@@ -14,7 +14,6 @@
 
 Player player;
 std::vector<Enemy> enemies;
-std::vector<EnemyBulletHole> enemy_bullet_holes;
 
 void scene_init() {
     glm::ivec2 screen_size = glm::ivec2(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -27,7 +26,7 @@ void scene_init() {
     glUniform2iv(glGetUniformLocation(ui_shader, "screen_size"), 1, glm::value_ptr(screen_size));
 
     for (EnemySpawn& enemy_spawn : enemy_spawns) {
-        Enemy enemy;
+        Enemy enemy(enemies.size());
         enemy.position = enemy_spawn.position;
         enemy.direction = glm::vec3(enemy_spawn.direction.x, 0.0f, enemy_spawn.direction.y);
         enemies.push_back(enemy);
@@ -39,7 +38,11 @@ void scene_init() {
 void scene_update(float delta) {
     // update player
     player.update(delta);
+
+    float player_velocity_length = glm::length(player.velocity);
     scene_move_and_slide(&player.position, &player.velocity, delta);
+    float lost_velocity = glm::length(player.velocity) - player_velocity_length;
+
     if (player.raycast_result.hit) {
         const RaycastPlane& plane = raycast_planes[player.raycast_result.plane];
         if (plane.type == PLANE_TYPE_LEVEL) {
@@ -48,39 +51,17 @@ void scene_update(float delta) {
                 .normal = plane.normal
             });
         } else if (plane.type == PLANE_TYPE_ENEMY) {
-            enemy_bullet_holes.push_back(EnemyBulletHole(player.raycast_result.point + (plane.normal * 0.05f), plane.normal));
-            enemies[plane.id].take_damage(1);
-            printf("hey\n");
+            enemies[plane.id].take_damage(player.raycast_result, 1);
         }
     }
 
     // update enemies
-    std::vector<unsigned int> indices_to_remove;
     for (unsigned int i = 0; i < enemies.size(); i++) {
         enemies[i].update(player.position, delta);
 
-        if (enemies[i].is_dead) {
-            indices_to_remove.push_back(i);
-        }
         if (enemies[i].hit_player) {
             player.take_damage(7);
         }
-    }
-    for (unsigned int index : indices_to_remove) {
-        raycast_planes.erase(raycast_planes.begin() + enemies[index].hurtbox_raycast_plane);
-        enemies.erase(enemies.begin() + index);
-    }
-    indices_to_remove.clear();
-
-    // update enemy bullet holes
-    for (unsigned int i = 0; i < enemy_bullet_holes.size(); i++) {
-        enemy_bullet_holes[i].update(delta);
-        if (enemy_bullet_holes[i].animation.is_finished) {
-            indices_to_remove.push_back(i);
-        }
-    }
-    for (unsigned int index : indices_to_remove) {
-        enemy_bullet_holes.erase(enemy_bullet_holes.begin() + index);
     }
 }
 
@@ -155,6 +136,10 @@ void scene_move_and_slide(glm::vec3* position, glm::vec3* velocity, float delta)
             }
         }
         for (Enemy& enemy : enemies) {
+            if (enemy.is_dead) {
+                continue;
+            }
+
             RaycastPlane& enemy_plane = raycast_planes[enemy.hurtbox_raycast_plane];
             if (position->y >= enemy_plane.a.y && position->y <= enemy_plane.d.y) {
                 wall_a.push_back(glm::vec2(enemy_plane.b.x, enemy_plane.b.z));
@@ -224,9 +209,6 @@ void scene_render() {
 
     for (Enemy& enemy : enemies) {
         enemy.render();
-    }
-    for (EnemyBulletHole& enemy_bullet_hole : enemy_bullet_holes) {
-        enemy_bullet_hole.render();
     }
 
     player.render();

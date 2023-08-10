@@ -18,7 +18,7 @@ const float fade_amount = 16.0;
 const float flash_start_time = 0.0;
 const float flash_duration = 0.1;
 const float fade_start_time = flash_start_time + flash_duration;
-const float fade_end_time = fade_start_time + 2.07;
+const float fade_end_time = fade_start_time + 1.5;
 
 float random (vec2 st) {
     return fract(sin(dot(st.xy,
@@ -34,7 +34,7 @@ void main() {
 
     vec2 tuv = texture_coordinate;
     if (time > fade_start_time) {
-        float interpolation = pow(cos((time - fade_start_time) + 4.21) * fade_speed, fade_amount);
+        float interpolation = pow(cos((time - fade_start_time) + 4.8) * fade_speed, fade_amount);
         float fade = max(interpolation, 1.0);
 
         float xx = abs(texture_coordinate.x - 0.5) * corner_harshness;
@@ -45,7 +45,7 @@ void main() {
 
     vec3 noise = vec3(random(tuv));
     float player_health_percent = player_health / 100.0;
-    float noise_percent = 0.05 + (0.1 * (1.0 - player_health_percent));
+    float noise_percent = (0.1 * (1.0 - player_health_percent));
     if (disable_noise == 0 && time > flash_start_time && time <= flash_start_time + flash_duration) {
         noise_percent = 0.3;
     }
@@ -70,15 +70,4 @@ void main() {
     if (tuv.y >= 1.0) frag_color = vec4(0.0);
     if (tuv.x <= 0.0) frag_color = vec4(0.0);
     if (tuv.y <= 0.0) frag_color = vec4(0.0);
-
-    /*
-    } else {
-        vec3 noise = vec3(random(texture_coordinate));
-        vec3 sampled = vec3(texture(screen_texture, texture_coordinate));
-        float player_health_percent = player_health / 100.0;
-        // if (player_health_percent <= 0.3) noise_percent = 0.15;
-        vec3 color = mix(sampled, noise, noise_percent);
-        frag_color = vec4(color, 1.0);
-    }
-    */
 }

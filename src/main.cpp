@@ -29,8 +29,8 @@ unsigned int quad_vao;
 SDL_Window* window;
 SDL_GLContext context;
 
-unsigned int WINDOW_WIDTH = 640;
-unsigned int WINDOW_HEIGHT = 360;
+unsigned int WINDOW_WIDTH = 1280;
+unsigned int WINDOW_HEIGHT = 720;
 
 const unsigned long FRAME_TIME = 1000.0 / 60.0;
 unsigned long last_time = SDL_GetTicks();
@@ -51,10 +51,8 @@ int main(int argc, char** argv) {
             level_path = arg.substr(arg.find("=") + 1);
         }
     }
-
-    if (!edit_mode) {
-        WINDOW_WIDTH = 1280;
-        WINDOW_HEIGHT = 720;
+    if (level_path == "") {
+        level_path = "./map/test.map";
     }
 
     srand(time(NULL));

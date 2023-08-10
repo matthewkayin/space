@@ -17,7 +17,7 @@ RaycastResult raycast_cast(glm::vec3 origin, glm::vec3 direction, float range, b
     for (unsigned int plane = 0; plane < raycast_planes.size(); plane++) {
         const RaycastPlane& raycast_plane = raycast_planes[plane];
 
-        if (ignore_enemies && raycast_plane.type == PLANE_TYPE_ENEMY) {
+        if (!raycast_plane.enabled || (ignore_enemies && raycast_plane.type == PLANE_TYPE_ENEMY)) {
             continue;
         }
 
