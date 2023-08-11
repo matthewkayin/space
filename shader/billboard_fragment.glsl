@@ -62,6 +62,9 @@ void main() {
         sample_coordinate.x = 1.0 - sample_coordinate.x;
     }
     vec4 sampled = texture(u_texture_array, sample_coordinate);
+    if (sampled.a < 0.1) {
+        discard;
+    }
     frag_color = vec4(light_result, 1.0) * sampled;
 }
 

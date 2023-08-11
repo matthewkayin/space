@@ -13,7 +13,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 Player player;
-std::vector<Enemy> enemies;
 
 void scene_init() {
     glm::ivec2 screen_size = glm::ivec2(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -205,8 +204,8 @@ void scene_render() {
 
     level_render(view, projection, player.position, player.flashlight_direction, player.flashlight_on);
 
-    // bind quad vertex
-
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
     for (Enemy& enemy : enemies) {
         enemy.render();
     }

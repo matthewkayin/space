@@ -9,6 +9,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+std::vector<Enemy> enemies;
+
 enum EnemyAnimation {
     ENEMY_ANIMATION_IDLE,
     ENEMY_ANIMATION_ATTACK,
@@ -139,9 +141,24 @@ void Enemy::update(glm::vec3 player_position, float delta) {
             }
             velocity.y += y_direction * std::min(0.05f * delta, abs(position.y - player_position.y));
         }
+    }
 
+    glm::vec3 separation = glm::vec3(0.0f, 0.0f, 0.0f);
+    for (unsigned int i = 0; i < enemies.size(); i++) {
+        if (i == raycast_planes[hurtbox_raycast_plane].id || enemies[i].is_dead) {
+            continue;
+        }
+
+        glm::vec3 difference = enemies[i].position - position;
+        if (glm::length(difference) <= 1.0f) {
+            separation += -difference;
+        }
+    }
+    velocity += separation * 0.1f * delta;
+
+    float velocity_length = glm::length(velocity);
+    if (velocity_length != 0.0f) {
         RaycastResult result = raycast_cast(position, glm::normalize(velocity), 1.0f, true);
-        float velocity_length = glm::length(velocity);
         unsigned int attempts = 1;
         while (result.hit && attempts < 5) {
             glm::vec3 plane_normal = raycast_planes[result.plane].normal;
@@ -189,6 +206,10 @@ void Enemy::update(glm::vec3 player_position, float delta) {
 }
 
 void Enemy::take_damage(RaycastResult& result, int amount) {
+    if (is_dead || animation.animation == ENEMY_ANIMATION_DIE) {
+        return;
+    }
+
     health -= amount;
     if (health <= 0) {
         animation.set_animation(ENEMY_ANIMATION_DIE);

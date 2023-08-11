@@ -43,3 +43,5 @@ struct Enemy {
     void take_damage(RaycastResult& result, int amount);
     void render();
 };
+
+extern std::vector<Enemy> enemies;
