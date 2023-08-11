@@ -29,8 +29,8 @@ unsigned int quad_vao;
 SDL_Window* window;
 SDL_GLContext context;
 
-unsigned int WINDOW_WIDTH = 1280;
-unsigned int WINDOW_HEIGHT = 720;
+unsigned int WINDOW_WIDTH;
+unsigned int WINDOW_HEIGHT;
 
 const unsigned long FRAME_TIME = 1000.0 / 60.0;
 unsigned long last_time = SDL_GetTicks();
@@ -53,6 +53,10 @@ int main(int argc, char** argv) {
     }
     if (level_path == "") {
         level_path = "./map/test.map";
+    }
+
+    if (!config_init()) {
+        return -1;
     }
 
     srand(time(NULL));
@@ -121,6 +125,7 @@ int main(int argc, char** argv) {
 
     glUseProgram(screen_shader);
     glUniform1i(glGetUniformLocation(screen_shader, "screen_texture"), 0);
+    glUniform1ui(glGetUniformLocation(screen_shader, "disable_noise"), disable_noise);
 
     // setup edit mode
     unsigned int main_window_id = SDL_GetWindowID(window);

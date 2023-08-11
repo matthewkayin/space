@@ -134,6 +134,7 @@ void scene_move_and_slide(glm::vec3* position, glm::vec3* velocity, float delta)
                 wall_normal.push_back(sector->walls[wall].normal);
             }
         }
+        /*
         for (Enemy& enemy : enemies) {
             if (enemy.is_dead) {
                 continue;
@@ -146,6 +147,7 @@ void scene_move_and_slide(glm::vec3* position, glm::vec3* velocity, float delta)
                 wall_normal.push_back(enemy_plane.normal);
             }
         }
+        */
 
         for (unsigned int wall_index = 0; wall_index < wall_a.size(); wall_index++) {
             glm::vec2 velocity2d = glm::vec2(actual_velocity.x, actual_velocity.z);
