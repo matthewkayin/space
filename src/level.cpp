@@ -376,6 +376,9 @@ void level_save_file() {
     for (EnemySpawn& enemy_spawn : enemy_spawns) {
         file << "e " << vec3_to_string(enemy_spawn.position) << " " << vec2_to_string(enemy_spawn.direction) << std::endl;
     }
+    for (PointLight& light : lights) {
+        file << "l " << vec3_to_string(light.position) << " " << std::to_string(light.constant) << " " << std::to_string(light.linear) << " " << std::to_string(light.quadratic) << std::endl;
+    }
     for (Sector& sector : sectors) {
         file << "s " << std::to_string(sector.floor_y) << " " << std::to_string(sector.ceiling_y) << " " << std::to_string(sector.floor_texture_index) << " " << std::to_string(sector.ceiling_texture_index) << " ";
         for (unsigned int i = 0; i < sector.vertices.size(); i++) {
@@ -411,6 +414,13 @@ void level_init(std::string path) {
                         .position = string_to_vec3(words[1]),
                         .direction = string_to_vec2(words[2])
                     });
+                } else if (words[0] == "l") {
+                    lights.push_back({
+                        .position = string_to_vec3(words[1]),
+                        .constant = std::stof(words[2]),
+                        .linear = std::stof(words[3]),
+                        .quadratic = std::stof(words[4]),
+                    });
                 } else if (words[0] == "s") {
                     Sector new_sector;
                     new_sector.floor_y = std::stof(words[1]);
@@ -428,15 +438,6 @@ void level_init(std::string path) {
             file.close();
         }
     }
-
-    // create lights
-    PointLight light = {
-        .position = glm::vec3(-2.8, 1.5f, 4.8f),
-        .constant = 1.0f,
-        .linear = 0.022f,
-        .quadratic = 0.0019f
-    };
-    lights.push_back(light);
 
     glUseProgram(texture_shader);
     glUniform1i(glGetUniformLocation(texture_shader, "texture_array"), 0);

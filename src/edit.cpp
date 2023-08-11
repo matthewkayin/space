@@ -23,7 +23,8 @@ enum Mode {
 
 enum ObjectType {
     OBJECT_PLAYER,
-    OBJECT_ENEMY
+    OBJECT_ENEMY,
+    OBJECT_LIGHT
 };
 
 struct ObjectSelection {
@@ -129,7 +130,6 @@ bool edit_init() {
 
     viewport_width = (WINDOW_WIDTH - UI_WIDTH) / scale;
     viewport_height = WINDOW_HEIGHT / scale;
-    printf("viewport size %i %i\n", viewport_width, viewport_height);
     camera_offset = glm::ivec2(viewport_width / 2, viewport_height / 2);
     precise_camera_offset = glm::vec2(camera_offset);
 
@@ -277,6 +277,22 @@ void edit_update() {
                     }
                 }
 
+                for (unsigned int i = 0; i < lights.size(); i++) {
+                    p = {
+                        .x = (4 * ((int)(lights[i].position.x * 8.0f) + camera_offset.x) - 2),
+                        .y = (4 * ((int)(lights[i].position.z * 8.0f) + camera_offset.y) - 2),
+                        .w = 8,
+                        .h = 8
+                    };
+
+                    if (is_mouse_in_rect(p)) {
+                        object_selections.push_back({
+                            .type = OBJECT_LIGHT,
+                            .index = i
+                        });
+                    }
+                }
+
                 refresh_ui_boxes();
             } else if (mode == MODE_NEW_OBJECT) {
                 if (new_object_type == OBJECT_ENEMY) {
@@ -288,6 +304,19 @@ void edit_update() {
                     object_selections.push_back({
                         .type = OBJECT_ENEMY,
                         .index = (unsigned int)(enemy_spawns.size() - 1)
+                    });
+                    refresh_ui_boxes();
+                } else if (new_object_type == OBJECT_LIGHT) {
+                    lights.push_back({
+                        .position = glm::vec3(mouse_snapped_position.x, 0.0f, mouse_snapped_position.y) / 8.0f,
+                        .constant = 1.0f,
+                        .linear = 0.022f,
+                        .quadratic = 0.0019f
+                    });
+                    mode = MODE_OBJECT;
+                    object_selections.push_back({
+                        .type = OBJECT_LIGHT,
+                        .index = (unsigned int)(lights.size() - 1)
                     });
                     refresh_ui_boxes();
                 }
@@ -335,6 +364,8 @@ void edit_update() {
                         player_spawn_point += glm::vec3(drag_movement.x, 0.0f, drag_movement.y);
                     } else if (object_selection.type == OBJECT_ENEMY) {
                         enemy_spawns[object_selection.index].position += glm::vec3(drag_movement.x, 0.0f, drag_movement.y);
+                    } else if (object_selection.type == OBJECT_LIGHT) {
+                        lights[object_selection.index].position += glm::vec3(drag_movement.x, 0.0f, drag_movement.y);
                     }
                 }
             }
@@ -391,6 +422,16 @@ void edit_update() {
             refresh_ui_boxes();
         }
 
+        // toggle new object type
+        if (mode == MODE_NEW_OBJECT && input.is_action_just_pressed[INPUT_FORWARD]) {
+            if (new_object_type == OBJECT_ENEMY) {
+                new_object_type = OBJECT_LIGHT;
+            } else {
+                new_object_type = OBJECT_ENEMY;
+            }
+            refresh_ui_boxes();
+        }
+
         // cancel new object mode
         if (mode == MODE_NEW_OBJECT && input.is_action_just_pressed[INPUT_DOWN]) {
             mode = MODE_OBJECT;
@@ -407,6 +448,9 @@ void edit_update() {
         if (mode == MODE_OBJECT && input.is_action_just_pressed[INPUT_DELETE] && ui_hover_index != -1) {
             if (object_selections[ui_hover_index].type == OBJECT_ENEMY) {
                 enemy_spawns.erase(enemy_spawns.begin() + object_selections[ui_hover_index].index);
+                object_selections.erase(object_selections.begin() + ui_hover_index);
+            } else if (object_selections[ui_hover_index].type == OBJECT_LIGHT) {
+                lights.erase(lights.begin() + object_selections[ui_hover_index].index);
                 object_selections.erase(object_selections.begin() + ui_hover_index);
             }
             refresh_ui_boxes();
@@ -518,6 +562,8 @@ void edit_update() {
                 player_spawn_point.y -= input.mouse_raw_yrel * 0.5f;
             } else if (object_selections[ui_hover_index].type == OBJECT_ENEMY) {
                 enemy_spawns[object_selections[ui_hover_index].index].position.y -= input.mouse_raw_yrel * 0.5f;
+            } else if (object_selections[ui_hover_index].type == OBJECT_LIGHT) {
+                lights[object_selections[ui_hover_index].index].position.y -= input.mouse_raw_yrel * 0.5f;
             }
         }
 
@@ -604,38 +650,56 @@ void edit_render() {
         edit_render_sector_vertices(new_sector, vertex_color);
     }
 
-    // Render player spawn
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    // begin render objects
+    std::vector<glm::vec2> object_points;
+    std::vector<glm::ivec3> object_colors;
+
+    // add player to be rendered
+    object_points.push_back(glm::vec2(player_spawn_point.x, player_spawn_point.z));
+    glm::ivec3 player_color = glm::ivec3(0, 255, 0);
     for (ObjectSelection& object_selection : object_selections) {
         if (object_selection.type == OBJECT_PLAYER) {
-            SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+            player_color = glm::ivec3(255, 255, 0);
             break;
         }
     }
-    SDL_Rect p = {
-        .x = (int)(player_spawn_point.x * 8.0f) + camera_offset.x,
-        .y = (int)(player_spawn_point.z * 8.0f) + camera_offset.y,
-        .w = 1,
-        .h = 1
-    };
-    SDL_RenderDrawRect(renderer, &p);
+    object_colors.push_back(player_color);
 
-    // Render enemy spawns
+    // add enemies to be rendered
     for (unsigned int i = 0; i < enemy_spawns.size(); i++) {
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        object_points.push_back(glm::vec2(enemy_spawns[i].position.x, enemy_spawns[i].position.z));
+        glm::ivec3 enemy_color = glm::ivec3(255, 0, 0);
         for (ObjectSelection& object_selection : object_selections) {
             if (object_selection.type == OBJECT_ENEMY && object_selection.index == i) {
-                SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+                enemy_color = glm::ivec3(255, 255, 0);
                 break;
             }
         }
+        object_colors.push_back(enemy_color);
+    }
 
-        p = {
-            .x = (int)(enemy_spawns[i].position.x * 8.0f) + camera_offset.x,
-            .y = (int)(enemy_spawns[i].position.z * 8.0f) + camera_offset.y,
+    // add lights to be rendered
+    for (unsigned int i = 0; i < lights.size(); i++) {
+        object_points.push_back(glm::vec2(lights[i].position.x, lights[i].position.z));
+        glm::ivec3 light_color = glm::ivec3(0, 255, 255);
+        for (ObjectSelection& object_selection : object_selections) {
+            if (object_selection.type == OBJECT_LIGHT && object_selection.index == i) {
+                light_color = glm::ivec3(255, 255, 0);
+                break;
+            }
+        }
+        object_colors.push_back(light_color);
+    }
+
+    // Render objects
+    for (unsigned int i = 0; i < object_points.size(); i++) {
+        SDL_Rect p = {
+            .x = (int)(object_points[i].x * 8.0f) + camera_offset.x,
+            .y = (int)(object_points[i].y * 8.0f) + camera_offset.y,
             .w = 1,
             .h = 1
         };
+        SDL_SetRenderDrawColor(renderer, object_colors[i].x, object_colors[i].y, object_colors[i].z, 255);
         SDL_RenderDrawRect(renderer, &p);
     }
 
@@ -684,12 +748,17 @@ void edit_render() {
                 edit_render_ui_text("Enemy " + std::to_string(object_selection.index));
                 edit_render_ui_text("y: " + std::to_string(enemy_spawns[object_selection.index].position.y));
                 edit_render_ui_text("direction: " + std::to_string((int)enemy_spawns[object_selection.index].direction.x) + "," + std::to_string((int)enemy_spawns[object_selection.index].direction.y));
+            } else if (object_selection.type == OBJECT_LIGHT) {
+                edit_render_ui_text("Light " + std::to_string(object_selection.index));
+                edit_render_ui_text("y: " + std::to_string(lights[object_selection.index].position.y));
             }
         }
     } else if (mode == MODE_NEW_OBJECT) {
         edit_render_ui_text("New Object Mode");
         if (new_object_type == OBJECT_ENEMY) {
             edit_render_ui_text("Type: Enemy");
+        } else if (new_object_type == OBJECT_LIGHT) {
+            edit_render_ui_text("Type: Light");
         }
     }
 
