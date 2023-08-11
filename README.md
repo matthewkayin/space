@@ -5,6 +5,8 @@ The way **level geometry** is generated is inspired by the concept of "sectors" 
 
 The game implements **frustum culling** so that only sectors that are visible within the camera frustum are rendered.
 
+Text is rendered using a bitmap font and **texture atlasing**. Animations and level textures use **texture arrays**.
+
 Since the game is a zero-gravity shooter, players can move and rotate in any direction. I use an **orthonormal basis vector** to keep track of their rotation.
 
 ![](./docs/0.gif)
