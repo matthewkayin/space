@@ -74,13 +74,6 @@ int main(int argc, char** argv) {
     SDL_GL_LoadLibrary(NULL);
 
     glm::ivec2 window_position = glm::ivec2(SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED);
-    if (edit_mode) {
-        SDL_Rect display_bounds;
-        SDL_GetDisplayBounds(0, &display_bounds);
-        window_position.x = (display_bounds.w / 2) + (SCREEN_WIDTH / 4);
-        window_position.y = (display_bounds.h / 2) - (SCREEN_HEIGHT / 2);
-    }
-
     window = SDL_CreateWindow("zerog", window_position.x, window_position.y, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
     if (window == NULL) {
         printf("Error creating window: %s\n", SDL_GetError());

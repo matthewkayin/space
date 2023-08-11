@@ -51,11 +51,11 @@ SDL_Rect ui_rect;
 SDL_Rect texture_picker_rect;
 
 unsigned int scale = 4;
-unsigned int viewport_width = (WINDOW_WIDTH - UI_WIDTH) / scale;
-unsigned int viewport_height = WINDOW_HEIGHT / scale;
+unsigned int viewport_width;
+unsigned int viewport_height;
 
-glm::ivec2 camera_offset = glm::ivec2(viewport_width / 2, viewport_height / 2);
-glm::vec2 precise_camera_offset = glm::vec2(camera_offset);
+glm::ivec2 camera_offset;
+glm::vec2 precise_camera_offset;
 
 Mode mode = MODE_SECTOR;
 std::vector<unsigned int> selected_sectors;
@@ -124,8 +124,14 @@ bool edit_init() {
     glm::ivec2 window_position;
     SDL_Rect display_bounds;
     SDL_GetDisplayBounds(0, &display_bounds);
-    window_position.x = (display_bounds.w / 2) - (WINDOW_WIDTH / 4) - WINDOW_WIDTH;
-    window_position.y = (display_bounds.h / 2) - (WINDOW_HEIGHT / 2);
+    window_position.x = SDL_WINDOWPOS_UNDEFINED;
+    window_position.y = SDL_WINDOWPOS_UNDEFINED;
+
+    viewport_width = (WINDOW_WIDTH - UI_WIDTH) / scale;
+    viewport_height = WINDOW_HEIGHT / scale;
+    printf("viewport size %i %i\n", viewport_width, viewport_height);
+    camera_offset = glm::ivec2(viewport_width / 2, viewport_height / 2);
+    precise_camera_offset = glm::vec2(camera_offset);
 
     int img_flags = IMG_INIT_PNG;
     if (!(IMG_Init(img_flags) & img_flags)) {
@@ -696,7 +702,7 @@ void edit_render() {
     };
     SDL_Rect dst_rect = {
         .x = ui_rect.x + 64,
-        .y = (int)(viewport_height - 64),
+        .y = (int)(WINDOW_HEIGHT - 64),
         .w = 64,
         .h = 64
     };

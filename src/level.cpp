@@ -429,7 +429,6 @@ void level_init(std::string path) {
         }
     }
 
-    /*
     // create lights
     PointLight light = {
         .position = glm::vec3(-2.8, 1.5f, 4.8f),
@@ -437,14 +436,7 @@ void level_init(std::string path) {
         .linear = 0.022f,
         .quadratic = 0.0019f
     };
-    PointLight light2 = {
-        .position = glm::vec3(1.0f, 1.5f, -2.0f),
-        .constant = 1.0f,
-        .linear = 0.022f,
-        .quadratic = 0.0019f
-    };
     lights.push_back(light);
-    */
 
     glUseProgram(texture_shader);
     glUniform1i(glGetUniformLocation(texture_shader, "texture_array"), 0);

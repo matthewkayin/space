@@ -116,6 +116,7 @@ void Enemy::update(glm::vec3 player_position, float delta) {
         angle = 180.0f - (-angle - 180.0f);
     }
 
+    // check if has seen player
     if (!has_seen_player && abs(angle) < 90.0f) {
         RaycastResult result = raycast_cast(position, glm::normalize(player_position - position), glm::length(player_position - position), true);
         if (!result.hit) {
@@ -123,26 +124,28 @@ void Enemy::update(glm::vec3 player_position, float delta) {
         }
     }
 
+    // begin attack animation
     if (has_seen_player && abs(angle) < 30.0f && animation.animation == ENEMY_ANIMATION_IDLE && glm::length(position - player_position) <= 1.0f) {
         animation.set_animation(ENEMY_ANIMATION_ATTACK);
         has_hit = true;
     }
 
+    // follow player
     if (has_seen_player) {
         direction = direction + ((facing_direction - direction) * 0.05f * delta);
-        float dist2d = glm::length(glm::vec2(player_position.x, player_position.z) - glm::vec2(position.x, position.z));
-        if (dist2d > 1.0f) {
-            velocity += direction * std::min(dist2d, 0.1f * delta);
-        }
-        if (abs(position.y - player_position.y) > 0.2f) {
-            float y_direction = 1.0f;
-            if (player_position.y < position.y) {
+        float dist = glm::length(position - player_position);
+        if (dist > 1.0f) {
+            float y_direction = 0.0f;
+            if (position.y + 0.05f < player_position.y) {
+                y_direction = 1.0f;
+            } else if (position.y - 0.05f > player_position.y) {
                 y_direction = -1.0f;
             }
-            velocity.y += y_direction * std::min(0.05f * delta, abs(position.y - player_position.y));
+            position += glm::vec3(direction.x, y_direction, direction.z) * std::min(0.1f * delta, dist);
         }
     }
 
+    // separation against other enemies
     glm::vec3 separation = glm::vec3(0.0f, 0.0f, 0.0f);
     for (unsigned int i = 0; i < enemies.size(); i++) {
         if (i == raycast_planes[hurtbox_raycast_plane].id || enemies[i].is_dead) {
@@ -156,9 +159,10 @@ void Enemy::update(glm::vec3 player_position, float delta) {
     }
     velocity += separation * 0.1f * delta;
 
+    // check wall collisions
     float velocity_length = glm::length(velocity);
     if (velocity_length != 0.0f) {
-        RaycastResult result = raycast_cast(position, glm::normalize(velocity), 1.0f, true);
+        RaycastResult result = raycast_cast(position, glm::normalize(velocity), 2.0f, true);
         unsigned int attempts = 1;
         while (result.hit && attempts < 5) {
             glm::vec3 plane_normal = raycast_planes[result.plane].normal;
@@ -178,6 +182,7 @@ void Enemy::update(glm::vec3 player_position, float delta) {
             velocity = glm::vec3(0.0f, 0.0f, 0.0f);
         }
 
+        // movement
         position += velocity;
     }
 
