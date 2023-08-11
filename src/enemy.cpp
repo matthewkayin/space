@@ -141,7 +141,7 @@ void Enemy::update(glm::vec3 player_position, float delta) {
             } else if (position.y - 0.05f > player_position.y) {
                 y_direction = -1.0f;
             }
-            position += glm::vec3(direction.x, y_direction, direction.z) * std::min(0.1f * delta, dist);
+            velocity += glm::vec3(direction.x, y_direction, direction.z) * std::min(0.1f * delta, dist);
         }
     }
 
